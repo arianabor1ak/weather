@@ -3,8 +3,8 @@
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------
 String data;
-String b_data = "";                       // this is the bottom of the tower data, including 30V power supply, approx. 130 fields
-String one_data = "";                     // this is the top sections multiplexer data, or misc data from various sensors, approx. 83 fields
+String b_data = "";                       // this is the bottom of the tower data, including 30V power supply, approx. 170 fields
+String one_data = "";                     // this is the top sections multiplexer data, or misc data from various sensors, approx. 115 fields
 String two_data = "";                     // this is the sway sensor data, approx. 80 fields
 String three_data = "";                   // this is the flux sensor data, approx. 62 fields
 String four_data = "";                    // this is the traixial magnetometer data, approx. 83 fields
