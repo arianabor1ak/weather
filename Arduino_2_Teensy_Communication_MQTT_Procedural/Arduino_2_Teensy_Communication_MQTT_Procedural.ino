@@ -39,7 +39,8 @@
 //                                    VARIABLES USED
 //                                      
 
-byte mac[] = { 0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c };        //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
+// byte mac[] = { 0x04, 0xe9, 0xe5, 0x0e, 0x52, 0xee };        //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
+byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};      //MAC address for Snowy
 
 EthernetClient ethClient;
 PubSubClient mqttClient(ethClient);
@@ -122,7 +123,7 @@ void publish_string(String topic, String data) {
 // String request_data() {} //is this necessary? how is this different from callback?
 
 void setup() {
-  Serial1.begin(9600);                            // baud rate to talk to the Arduino Mega; simulator uses 9600
+  Serial1.begin(57600);                            // baud rate to talk to the Arduino Mega; simulator uses 9600
   Serial.begin(57600);                             // baud rate for the teensy serial monitor
   // while (!Serial);                                // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
