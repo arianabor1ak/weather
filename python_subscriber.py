@@ -33,36 +33,32 @@ def retrieve_table():
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
-    client.setKeepAlive(30)
     connect_to_database() #This should go somewhere (probably here) because we need to connect to the database first
     print("Connected with result code: " + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     client.subscribe("CarletonWeatherTower")
-    client.subscribe("test") #remove this after testing
+    # client.subscribe("test") #remove this after testing
 
 # The callback for when a PUBLISH message is received from the server.
-def on_message(client, userdata, message):
-    print("I have a message: ")
-    # global current_master_string
-    # current_master_string = msg.payload.decode("utf-8")
-    # insert_master_string()
-    print(str(message.payload.decode("utf-8")))
+def on_message(client, userdata, msg):
+    # print("I have a message: ")
+    global current_master_string
+    current_master_string = msg.payload.decode("utf-8")
+    insert_master_string()
+    print(str(msg.payload.decode("utf-8"))) #for testing
 
 # Creating the client object with an approporiate id
 client = mqtt.Client(client_id="Python Handler")
 
 # Setting the callback function for connections
-# client.on_connect = on_connect #can't connect to database right now
-
-# Connecting to broker
-client.connect("test.mosquitto.org", 1883) #do we need 60?
-
-client.subscribe("CarletonWeatherTower") #remove this once connected to database
-# client.subscribe("test") #remove this after testing
+client.on_connect = on_connect
 
 # Setting the callback function for message reception 
 client.on_message = on_message
+
+# Connecting to broker
+client.connect("test.mosquitto.org", 1883, 60)	# connect(host, port=1883, keepalive=60, bind_address=””)
 
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.
