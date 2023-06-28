@@ -29,6 +29,7 @@
 #include <TimeLib.h>
 #include <NativeEthernet.h>     //Teensy 4.1 specific ethernet library
 #include <PubSubClient.h>       //Teensy MQTT implementation library
+#include <SD.h>
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
@@ -46,6 +47,8 @@ EthernetClient ethClient;
 PubSubClient mqttClient(ethClient);
 
 String topic = "CarletonWeatherTower";
+
+int SDtestFileName = 0;
 
 String input = "";                                          //legacy code
 String data = "";                                           //legacy code
@@ -120,6 +123,50 @@ void publish_string(String topic, String data) {
   Serial.println(mqttClient.publish(topic_array, data_array));
 }
 
+/* !NEEDS TESTING
+ * Saves the Multiplexer  
+ * data to an SD card as a .txt file
+ * The specificed file name should not include the file type (.txt), only the name.
+ */
+void saveDataToSD(String dataString, String fileName) {
+  fileName += ".txt";
+  File savedData = SD.open(fileName.c_str(), FILE_WRITE); //should we name the file with the time/date?
+  if (savedData) {
+    savedData.println(dataString);
+    savedData.close();
+    Serial.print("Data saved to SD card: ");
+    Serial.println(dataString); // Remove after testing
+    Serial.print("In file:"); // Remove after testing
+    Serial.println(fileName); // Remove after testing
+  } else {
+    Serial.println("error opening file");
+  }
+}
+
+// Reads data from the SD card from the specified file name 
+// ** The specificed file name should not include the file type, only the name. 
+// ** It is assumed all files on the SD card are .txt files.
+// Returns void for now. Could return the string from the file or
+// could return void and publish the string within this function.
+void readFromSD(String fileName) {
+  String returnStr = "";
+  fileName += ".txt";
+  File fileSD = SD.open(fileName.c_str(), FILE_READ);
+  if (fileSD) {
+    Serial.println("in file:" + fileName);
+    // read from the file until there's nothing else in it:
+    while (fileSD.available()) {
+    	returnStr += fileSD.readString();
+    }
+    Serial.print("returnStr: ");
+    Serial.println(returnStr);
+    fileSD.close();
+  } else {
+  	// if the file didn't open, print an error:
+    Serial.println("error opening file");
+  }
+}
+
 // String request_data() {} //is this necessary? how is this different from callback?
 
 void setup() {
@@ -127,6 +174,14 @@ void setup() {
   Serial.begin(57600);                             // baud rate for the teensy serial monitor
   // while (!Serial);                                // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
+  delay(2000);
+
+  Serial.print("Initializing SD card...");            //!NEEDS TESTING
+  if (!SD.begin(BUILTIN_SDCARD)) {
+    Serial.println("SD initialization failed!");
+    while (1);
+  }
+  Serial.println("SD initialization done."); 
   delay(2000);
 
   setup_ethernet();
@@ -155,7 +210,9 @@ void loop() {
         // mqttClient.publish("test", "received data");
         if (!mqttClient.connected()) {
         // Serial.println("I'm not connected");
+
           commence_connection();
+          
         }
 
         data += Serial1.readString();    //checks whether or not the end of the data string sent by Arduino has been reached
@@ -163,6 +220,9 @@ void loop() {
         Serial.println(data);
         Serial.println("Publication topic: " + topic);
         publish_string(topic, data);
+        saveDataToSD(data, String(SDtestFileName));
         data = "";
+        readFromSD(SDtestFileName);
+        SDtestFileName += 1;
     }
 }
