@@ -40,15 +40,18 @@
 //                                    VARIABLES USED
 //                                      
 
-// byte mac[] = { 0x04, 0xe9, 0xe5, 0x0e, 0x52, 0xee };        //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
-byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};      //MAC address for Snowy
+
+ 
+
+// byte mac[] = { 0x04, 0xe9, 0xe5, 0x0e, 0x52, 0xee };     //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
+byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};          //MAC address for Snowy
 
 EthernetClient ethClient;
 PubSubClient mqttClient(ethClient);
 
 String topic = "CarletonWeatherTower";
 
-int SDtestFileName = 0;
+int SDtestFileName = 1000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
 
 String input = "";                                          //legacy code
 String data = "";                                           //legacy code
@@ -109,11 +112,6 @@ void commence_connection() {
   }
 }
 
-/*char* buffer_creator(String text) {
-  char text_array[text.length()];
-  return text.toCharArray(text_array, sizeof(text_array));
-}*/
-
 void publish_string(String topic, String data) {
   char topic_array[topic.length()* 2];
   topic.toCharArray(topic_array, sizeof(topic_array));
@@ -123,24 +121,20 @@ void publish_string(String topic, String data) {
   Serial.println(mqttClient.publish(topic_array, data_array));
 }
 
-/* !NEEDS TESTING
- * Saves the Multiplexer  
- * data to an SD card as a .txt file
- * The specificed file name should not include the file type (.txt), only the name.
- */
+// Saves the input data string to an SD card as a .txt file
+// ** The specificed file name should not include the file type (.txt), only the name.
+// ** The "".txt" is added inside the function
 void saveDataToSD(String dataString, String fileName) {
   fileName += ".txt";
   File savedData = SD.open(fileName.c_str(), FILE_WRITE); //should we name the file with the time/date?
   if (savedData) {
     savedData.println(dataString);
     savedData.close();
-    Serial.print("Data saved to SD card: ");
-    Serial.println(dataString); // Remove after testing
-    Serial.print("In file:"); // Remove after testing
-    Serial.println(fileName); // Remove after testing
+    Serial.print("Data saved to SD card in file: ");
+    Serial.println(fileName); 
   } else {
     Serial.println("error opening file");
-  }
+  } 
 }
 
 // Reads data from the SD card from the specified file name 
@@ -153,13 +147,11 @@ void readFromSD(String fileName) {
   fileName += ".txt";
   File fileSD = SD.open(fileName.c_str(), FILE_READ);
   if (fileSD) {
-    Serial.println("in file:" + fileName);
+    Serial.println("Reading from file:" + fileName);
     // read from the file until there's nothing else in it:
     while (fileSD.available()) {
-    	returnStr += fileSD.readStringUntil('@');
+    	returnStr += fileSD.readString();
     }
-    Serial.print("returnStr: ");
-    Serial.println(returnStr);
     fileSD.close();
   } else {
   	// if the file didn't open, print an error:
@@ -170,17 +162,16 @@ void readFromSD(String fileName) {
 // String request_data() {} //is this necessary? how is this different from callback?
 
 void setup() {
-  Serial1.begin(57600);                            // baud rate to talk to the Arduino Mega; simulator uses 9600
-  Serial.begin(57600);                             // baud rate for the teensy serial monitor
-  Serial.setTimeout(5000);
-  // while (!Serial);                                // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
+  Serial1.begin(57600);                         // baud rate to talk to the Arduino Mega; simulator uses 9600
+  Serial.begin(9600);                           // baud rate for the teensy serial monitor
+  // while (!Serial);                           // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
   delay(2000);
 
-  Serial.print("Initializing SD card...");            //!NEEDS TESTING
+  Serial.print("Initializing SD card...");     
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD initialization failed!");
-    while (1);
+    while (1);                                    // If the SD card initialization fails, the code effectively stops here. 
   }
   Serial.println("SD initialization done."); 
   delay(2000);
@@ -195,35 +186,62 @@ void setup() {
 //Sends signal to get data every 30 seconds
 void loop() {
     unsigned long current_millis = millis();
-    if (current_millis - previous_millis >= 30000) {     // get the data every 30 seconds
-      previous_millis = current_millis;                 // reset the millisecond tracker to the current time
-      Serial1.print("GD");                              // send a "GD" to the arduino to Get the Data
+    if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
+      previous_millis = current_millis;                   // reset the millisecond tracker to the current time
+      clearSerial1Buffer();       
+      Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
       Serial.println("Requesting data from the arduino");
     }
-    delay(5000);
-
-    // if (!mqttClient.connected()) {
-    //   Serial.println("I'm not connected");
-    //   commence_connection();
-    // }
+    // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
 
     if (Serial1.available()) {
+        data = "";    // initializing the final single string of data to be sent to database and/or saved to SD
+
+        // Need this char later on because Serial.read() sends text as ASCII decimal.
+        // Setting char character = Serial.read() will "typecast" the output as a char.
+        char character = 'a';
+
+        // Loops through Serial1 buffer until 'S'(the starting char) is detected.
+        // Maybe this detection code is unessary but the
+        // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
+        while (character != 'S')  {                                   
+          character = Serial1.read();       
+        } 
+        data.concat(character);     // Adds the 'S' that was detetected to the data string.        
+
+        // Reads from Serial1, byte by byte, and adds the char that was read
+        // until the terminating char '@' is read. 
+        while (character != '@') {                    // ASCII code for '@' = 64
+          while(Serial1.available()) {      
+            character = Serial1.read();
+            data.concat(character);
+          }
+        }
+
+        Serial.print("Data: ");
+        Serial.println(data);
+
         // mqttClient.publish("test", "received data");
         if (!mqttClient.connected()) {
         // Serial.println("I'm not connected");
-
-          commence_connection();
-          
+          commence_connection();          
         }
-
-        data += Serial1.readStringUntil('@');    //checks whether or not the end of the data string sent by Arduino has been reached
-        Serial.print("Data: ");
-        Serial.println(data);
-        Serial.println("Publication topic: " + topic);
+        Serial.println("Publication topic: " + topic); 
         publish_string(topic, data);
-        saveDataToSD(data, String(SDtestFileName));
-        data = "";
+
+        // SDtestFileName FOR TESTING ONLY, replace with RTC timestamp once implemented.
+        // readFromSD FOR TESTING ONLY. We may restructure code using interrupts to always read from SD,
+        // and interrupt every 30 seconds to request and write data to the SD card. 
+        saveDataToSD(data, String(SDtestFileName)); 
         readFromSD(SDtestFileName);
-        SDtestFileName += 1;
+        SDtestFileName += 1;      
     }
+}
+
+// Reads all of, and therefore effectively 
+// empties, the Serial1 buffer. 
+void clearSerial1Buffer() {
+  while (Serial1.available()) {
+    Serial1.read();
+  }
 }
