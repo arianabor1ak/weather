@@ -150,7 +150,7 @@ void readFromSD(String fileName) {
     Serial.println("Reading from file:" + fileName);
     // read from the file until there's nothing else in it:
     while (fileSD.available()) {
-    	returnStr += fileSD.readString();
+    	returnStr += fileSD.readStringUntil('@');
     }
     fileSD.close();
   } else {
@@ -162,9 +162,16 @@ void readFromSD(String fileName) {
 // String request_data() {} //is this necessary? how is this different from callback?
 
 void setup() {
+<<<<<<< HEAD
   Serial1.begin(57600);                         // baud rate to talk to the Arduino Mega; simulator uses 9600
   Serial.begin(9600);                           // baud rate for the teensy serial monitor
   // while (!Serial);                           // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
+=======
+  Serial1.begin(57600);                            // baud rate to talk to the Arduino Mega; simulator uses 9600
+  Serial.begin(57600);                             // baud rate for the teensy serial monitor
+  Serial.setTimeout(5000);
+  // while (!Serial);                                // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
+>>>>>>> 5fd0632745c7d4803b2fcce2a093bbb38f286ba6
   Serial.println("Teensy is in setup");
   delay(2000);
 
@@ -226,7 +233,15 @@ void loop() {
         // Serial.println("I'm not connected");
           commence_connection();          
         }
+<<<<<<< HEAD
         Serial.println("Publication topic: " + topic); 
+=======
+
+        data += Serial1.readStringUntil('@');    //checks whether or not the end of the data string sent by Arduino has been reached
+        Serial.print("Data: ");
+        Serial.println(data);
+        Serial.println("Publication topic: " + topic);
+>>>>>>> 5fd0632745c7d4803b2fcce2a093bbb38f286ba6
         publish_string(topic, data);
 
         // SDtestFileName FOR TESTING ONLY, replace with RTC timestamp once implemented.
