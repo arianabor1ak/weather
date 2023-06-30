@@ -46,11 +46,17 @@
 // byte mac[] = { 0x04, 0xe9, 0xe5, 0x0e, 0x52, 0xee };     //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
 byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};          //MAC address for Snowy
 
+ 
+
+// byte mac[] = { 0x04, 0xe9, 0xe5, 0x0e, 0x52, 0xee };     //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
+byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};          //MAC address for Snowy
+
 EthernetClient ethClient;
 PubSubClient mqttClient(ethClient);
 
 String topic = "CarletonWeatherTower";
 
+int SDtestFileName = 1000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
 int SDtestFileName = 1000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
 
 String input = "";                                          //legacy code
@@ -124,6 +130,9 @@ void publish_string(String topic, String data) {
 // Saves the input data string to an SD card as a .txt file
 // ** The specificed file name should not include the file type (.txt), only the name.
 // ** The "".txt" is added inside the function
+// Saves the input data string to an SD card as a .txt file
+// ** The specificed file name should not include the file type (.txt), only the name.
+// ** The "".txt" is added inside the function
 void saveDataToSD(String dataString, String fileName) {
   fileName += ".txt";
   File savedData = SD.open(fileName.c_str(), FILE_WRITE); //should we name the file with the time/date?
@@ -132,8 +141,11 @@ void saveDataToSD(String dataString, String fileName) {
     savedData.close();
     Serial.print("Data saved to SD card in file: ");
     Serial.println(fileName); 
+    Serial.print("Data saved to SD card in file: ");
+    Serial.println(fileName); 
   } else {
     Serial.println("error opening file");
+  } 
   } 
 }
 
@@ -148,9 +160,10 @@ void readFromSD(String fileName) {
   File fileSD = SD.open(fileName.c_str(), FILE_READ);
   if (fileSD) {
     Serial.println("Reading from file:" + fileName);
+    Serial.println("Reading from file:" + fileName);
     // read from the file until there's nothing else in it:
     while (fileSD.available()) {
-    	returnStr += fileSD.readStringUntil('@');
+    	returnStr += fileSD.readString();
     }
     fileSD.close();
   } else {
@@ -176,8 +189,10 @@ void setup() {
   delay(2000);
 
   Serial.print("Initializing SD card...");     
+  Serial.print("Initializing SD card...");     
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD initialization failed!");
+    while (1);                                    // If the SD card initialization fails, the code effectively stops here. 
     while (1);                                    // If the SD card initialization fails, the code effectively stops here. 
   }
   Serial.println("SD initialization done."); 
@@ -197,40 +212,20 @@ void loop() {
       previous_millis = current_millis;                   // reset the millisecond tracker to the current time
       clearSerial1Buffer();       
       Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
+    if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
+      previous_millis = current_millis;                   // reset the millisecond tracker to the current time
+      clearSerial1Buffer();       
+      Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
       Serial.println("Requesting data from the arduino");
     }
     // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
+    // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
 
     if (Serial1.available()) {
-        data = "";    // initializing the final single string of data to be sent to database and/or saved to SD
-
-        // Need this char later on because Serial.read() sends text as ASCII decimal.
-        // Setting char character = Serial.read() will "typecast" the output as a char.
-        char character = 'a';
-
-        // Loops through Serial1 buffer until 'S'(the starting char) is detected.
-        // Maybe this detection code is unessary but the
-        // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
-        while (character != 'S')  {                                   
-          character = Serial1.read();       
-        } 
-        data.concat(character);     // Adds the 'S' that was detetected to the data string.        
-
-        // Reads from Serial1, byte by byte, and adds the char that was read
-        // until the terminating char '@' is read. 
-        while (character != '@') {                    // ASCII code for '@' = 64
-          while(Serial1.available()) {      
-            character = Serial1.read();
-            data.concat(character);
-          }
-        }
-
-        Serial.print("Data: ");
-        Serial.println(data);
-
         // mqttClient.publish("test", "received data");
         if (!mqttClient.connected()) {
         // Serial.println("I'm not connected");
+          commence_connection();          
           commence_connection();          
         }
 <<<<<<< HEAD
@@ -248,10 +243,25 @@ void loop() {
         // readFromSD FOR TESTING ONLY. We may restructure code using interrupts to always read from SD,
         // and interrupt every 30 seconds to request and write data to the SD card. 
         saveDataToSD(data, String(SDtestFileName)); 
+
+        // SDtestFileName FOR TESTING ONLY, replace with RTC timestamp once implemented.
+        // readFromSD FOR TESTING ONLY. We may restructure code using interrupts to always read from SD,
+        // and interrupt every 30 seconds to request and write data to the SD card. 
+        saveDataToSD(data, String(SDtestFileName)); 
         readFromSD(SDtestFileName);
+        SDtestFileName += 1;      
         SDtestFileName += 1;      
     }
 }
+
+// Reads all of, and therefore effectively 
+// empties, the Serial1 buffer. 
+void clearSerial1Buffer() {
+  while (Serial1.available()) {
+    Serial1.read();
+  }
+}
+
 
 // Reads all of, and therefore effectively 
 // empties, the Serial1 buffer. 
