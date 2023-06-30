@@ -61,75 +61,40 @@ void loop()
     
     if (teensy_data == "GD")                        // the teensy tells the arduino to Gather the Data.  The teensy then waits for the Arduino to send the data   
     {                                         // the teensy reads the string of data.  Once it has it the Arduino collects the updated data.
-      
-      // stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "5-\t" + five_data + "@"; 
 
       int stringLength = stringToSend.length();
-      // int i = 0;
-      // while (i <= stringLength) 
-      // {
-      //     int j = 0;
-      //     while (j < 30 && i <= stringLength) //send 30 bytes at a time
-      //     {
-      //       Serial1.write(stringToSend.charAt(i));
-      //       i++;
-      //       j++;
-      //     }
-      //   delay(75);
-      // }
-
-      while(stringLength > 0) 
+      while(stringLength > 0) //while there are still characters in the string
       {
         int j = 0;
-        while (j < 30 && stringLength > 0)
+        while (j < 30 && stringLength > 0) //write 30 bytes at a time
         {
-          Serial1.write(stringToSend.charAt(0));
-          stringToSend.remove(0, 1);
+          Serial1.write(stringToSend.charAt(0)); //write one byte to the buffer
+          stringToSend.remove(0, 1); //remove the first character from the string
           stringLength--;
           j++;
         }
-        delay(75);
+        delay(75); //wait for the Teensy to read from the buffer
       }
 
-    Serial.print("QQ");                       // send a QQ to start the data collection
-    // delay(13000);                             // wait up to 13 seconds for the data to be collected
+      Serial.print("QQ");                       // send a QQ to start the data collection
+      // delay(13000);                          // wait up to 13 seconds for the data to be collected
+      //not sure if the delay is necessary since it's not affecting anything yet
    
       b_data = getData("SS");                 // read the bottom section data including 30 volt supply
-      //waitMicroseconds(5000);
     
       one_data = getData("11");               // read the top section mux data
-      //waitMicroseconds(5000);
     
       two_data = getData("22");               // read the top section sway sensor data
-      //waitMicroseconds(5000);
     
       three_data = getData("33");             // read the top section flux data
-      //waitMicroseconds(5000);
 
       four_data = getData("44");              // read the top section triaxial magnetometer sensor data
-      //waitMicroseconds(5000);
     
       five_data = getData("55");              // read the top section future data, acts as a placeholder for future data
-      //waitMicroseconds(5000);
 
+      //concatenate the string before the Teensy requests more data
       stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "5-\t" + five_data + "@";
     }
-}
-
-/*
- * This is used as an alternative to 
- * the delay() function. The millis() 
- * approach is recommended over the
- * delay() approach. In the case of 
- * this project, delay() also doesn't
- * seem to work.
- */
-void waitMicroseconds(long wait_time) 
-{
-  unsigned long current_time = millis();
-  while (millis() < current_time + wait_time)
-  {  
-  }  
 }
 
 /*
@@ -150,14 +115,12 @@ String getData(String letters){
   String data = "";
   char byte;
   Serial.print(letters);
-  while (millis() < current_time + 5000) 
+  while (millis() < current_time + 5000) //Loop for 5 seconds to make sure all the data is being read from the buffer
   {
     while (Serial.available()) 
     {
-      byte = Serial.read();
+      byte = Serial.read(); //read byte by byte
       data += byte;
-      // delay(200);
-      // data += Serial.read();
     }
   }
   clearSerialBuffer();
