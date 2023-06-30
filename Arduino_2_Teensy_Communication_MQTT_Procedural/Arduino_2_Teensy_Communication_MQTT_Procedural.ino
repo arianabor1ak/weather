@@ -156,7 +156,7 @@ void readFromSD(String fileName) {
     Serial.println("in file:" + fileName);
     // read from the file until there's nothing else in it:
     while (fileSD.available()) {
-    	returnStr += fileSD.readString();
+    	returnStr += fileSD.readStringUntil('@');
     }
     Serial.print("returnStr: ");
     Serial.println(returnStr);
@@ -172,6 +172,7 @@ void readFromSD(String fileName) {
 void setup() {
   Serial1.begin(57600);                            // baud rate to talk to the Arduino Mega; simulator uses 9600
   Serial.begin(57600);                             // baud rate for the teensy serial monitor
+  Serial.setTimeout(5000);
   // while (!Serial);                                // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
   delay(2000);
@@ -215,7 +216,7 @@ void loop() {
           
         }
 
-        data += Serial1.readString();    //checks whether or not the end of the data string sent by Arduino has been reached
+        data += Serial1.readStringUntil('@');    //checks whether or not the end of the data string sent by Arduino has been reached
         Serial.print("Data: ");
         Serial.println(data);
         Serial.println("Publication topic: " + topic);
