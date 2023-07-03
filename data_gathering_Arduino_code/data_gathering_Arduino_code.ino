@@ -113,16 +113,25 @@ void loop()
 String getData(String letters){
   unsigned long current_time = millis();
   String data = "";
-  char byte;
+  char byte = 'a';
   Serial.print(letters);
-  while (millis() < current_time + 5000) //Loop for 5 seconds to make sure all the data is being read from the buffer
-  {
-    while (Serial.available()) 
-    {
-      byte = Serial.read(); //read byte by byte
+
+  while (byte != '\r') {
+    while (Serial.available()) {
+      byte = Serial.read();
       data += byte;
     }
   }
+
+  // while (millis() < current_time + 5000) //Loop for 5 seconds to make sure all the data is being read from the buffer
+  // {
+  //   while (Serial.available()) 
+  //   {
+  //     byte = Serial.read(); //read byte by byte
+  //     data += byte;
+  //   }
+  // }
+  
   clearSerialBuffer();
   return data;
 }
