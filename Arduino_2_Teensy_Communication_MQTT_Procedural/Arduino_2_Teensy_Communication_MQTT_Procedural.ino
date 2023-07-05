@@ -41,9 +41,6 @@
 //                                    VARIABLES USED
 //                                      
 
-
- 
-
 // byte mac[] = { 0x04, 0xe9, 0xe5, 0x0e, 0x52, 0xee };     //MAC address for Gromit. Used to obtain an IP address from Carleton's DHCP
 byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};          //MAC address for Snowy
 
@@ -54,7 +51,7 @@ String topic = "CarletonWeatherTower";
 
 int SDtestFileName = 99000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
 
-// NTP Servers:
+// NTP Servers (2 alternatives are listed. It may be possible to connect to ntp pool and not worry about which specific ip is available): 
 IPAddress timeServer(129, 6, 15, 28); // time-a-g.nist.gov    NIST, Gaithersburg, Maryland
 // IPAddress timeServer(132, 163, 97, 1); // time-a-wwv.nist.gov    WWV, Fort Collins, Colorado
 // IPAddress timeServer(132, 163, 96, 1); // time-a-b.nist.gov    NIST, Boulder, Colorado
@@ -98,6 +95,8 @@ void setup_ethernet() {
   }  
 }
 
+// Syncs clock with time from NTP server listed in VARIABLES USED.
+// It attepmts to sync to the NTP server ever 24 hrs(86400 secs).
 void setup_NTP() {
   Udp.begin(localPort);
   Serial.println("Waiting for time sync.");
