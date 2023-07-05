@@ -60,7 +60,7 @@ const int timeZone = 0;         // Gives the actual accurate time. No shifting f
 
 EthernetUDP Udp;
 unsigned int localPort = 8888;  // local port to listen for UDP packets
-int timeOfLatestSync = 0;       // Used to sync clock to NTP server if latest sync was more than 24 hrs ago. 
+time_t timeOfLatestSync;       // Used to sync clock to NTP server if latest sync was more than 24 hrs ago. 
 
 
 String input = "";                                          //legacy code
@@ -81,9 +81,7 @@ unsigned long previous_millis = 0;                          //legacy code
 void setup_ethernet() {
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed to obtain an IP address using DHCP");
-
-
-    while(true);      // we cant have it loop without condition-less forever. 
+    while(true);      // we shouldn't have it loop without condition-less forever. 
 
   }
   else { 
@@ -94,13 +92,13 @@ void setup_ethernet() {
 }
 
 // Syncs clock with time from NTP server listed in VARIABLES USED.
-// It attepmts to sync to the NTP server ever 24 hrs(86400 secs).
+// It attepmts to sync to the NTP server ever 24 hrs(86400 secs, 86400000 ms).
 void setup_NTP() {
   Udp.begin(localPort);
   Serial.println("Waiting for time sync.");
   setSyncProvider(getNtpTime);
   timeOfLatestSync = now();
-  // setSyncInterval(86400);
+  // setSyncInterval(86400000);
 }
 
 //Choose the server to be used as a broker for communication
@@ -153,7 +151,7 @@ void saveDataToSD(String dataString, String fileName) {
   if (savedData) {
     savedData.println(dataString);
     savedData.close();
-    Serial.print("Data saved to SD card in file: " + fileName);
+    Serial.println("Data saved to SD card in file: " + fileName);
   } else {
     Serial.println("error opening file:" + fileName);
   } 
@@ -208,9 +206,24 @@ void setup() {
 
 //Sends signal to get data every 30 seconds
 void loop() {
+    // Returns 1 or 3 if connection is not maintained. 
+    // Returns 2 or 4 if successful. 0 = nothing happened/renewal was not needed.
+    byte ethReturnByte = Ethernet.maintain(); 
+
     unsigned long current_millis = millis();
     if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
       previous_millis = current_millis;                   // reset the millisecond tracker to the current time
+
+      // Checks if Ethernet connection is still good(and updates IP from DHCP)
+      // then syncs the time to NTP if the latest sync was more than 12 hrs ago. 
+      // Maybe we should have the MQTT connection stuff inside here as well, to check for internet connection first?
+      Serial.println("ethReturnByte: " + String(ethReturnByte));
+      if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
+        if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs
+          setup_NTP();
+        } 
+      }
+
       clearSerial1Buffer();       
       Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
       Serial.println("Requesting data from the arduino");
@@ -243,6 +256,8 @@ void loop() {
           }
         }
 
+        // We may restructure this code using interrupts to always read from SD,
+        // and interrupt every 30 seconds to request and write data to the SD card. 
         saveDataToSD(data, timeOfNewData); 
         readFromSD(timeOfNewData);
 
