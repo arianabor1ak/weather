@@ -133,13 +133,16 @@ void commence_connection() {
   }
 }
 
+// We increased the MQTT_MAX_PACKET_SIZE in the PubSubClient.h file to 3000
 void publish_string(String topic, String data) {
   char topic_array[topic.length()* 2];
   topic.toCharArray(topic_array, sizeof(topic_array));
   char data_array[data.length() * 2];
   data.toCharArray(data_array, sizeof(data_array));
+  Serial.print("data_array: ");
+  Serial.println(data_array);
   Serial.print("Publishing Check...");
-  Serial.println(mqttClient.publish(topic_array, data_array));
+  Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
 }
 
 // Saves the input data string to an SD card as a .txt file
@@ -206,8 +209,8 @@ void setup() {
 
 //Sends signal to get data every 30 seconds
 void loop() {
-    // Returns 1 or 3 if connection is not maintained. 
-    // Returns 2 or 4 if successful. 0 = nothing happened/renewal was not needed.
+    // Returns 1 or 3 if Ethernet connection is not maintained. 
+    // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
     byte ethReturnByte = Ethernet.maintain(); 
 
     unsigned long current_millis = millis();
@@ -219,7 +222,7 @@ void loop() {
       // Maybe we should have the MQTT connection stuff inside here as well, to check for internet connection first?
       Serial.println("ethReturnByte: " + String(ethReturnByte));
       if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
-        if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs
+        if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs *also unsure if int() is necessary
           setup_NTP();
         } 
       }
@@ -244,17 +247,28 @@ void loop() {
 
         // Records the time of when the 'S' is read
         String timeOfNewData = String(now());
-        data = timeOfNewData + "\t";               
-        data.concat(character);                         // Adds the 'S' that was detetected to the data string.        
+        data = timeOfNewData + "\t";   
+
+        data.concat(String(character));                         // Adds the 'S' that was detetected to the data string.        
 
         // Reads from Serial1, byte by byte, and adds the char that was read
         // until the terminating char '@' is read. 
         while (character != '@') {                      // ASCII code for '@' = 64
           while(Serial1.available()) {      
             character = Serial1.read();
-            data.concat(character);
+            data.concat(String(character));
           }
         }
+
+        // //TESTING
+        // int i = 0;
+        // while (i < 100) {                    
+        //   while(Serial1.available()) {      
+        //     character = Serial1.read();
+        //     data.concat(String(character));
+        //     i++;
+        //   }
+        // }
 
         // We may restructure this code using interrupts to always read from SD,
         // and interrupt every 30 seconds to request and write data to the SD card. 
