@@ -27,6 +27,7 @@
 //
 #include <SPI.h>
 #include <TimeLib.h>
+#include <NativeEthernetUdp.h>
 #include <NativeEthernet.h>     //Teensy 4.1 specific ethernet library
 #include <PubSubClient.h>       //Teensy MQTT implementation library
 #include <SD.h>
@@ -51,7 +52,21 @@ PubSubClient mqttClient(ethClient);
 
 String topic = "CarletonWeatherTower";
 
-int SDtestFileName = 1000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
+int SDtestFileName = 99000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
+
+// NTP Servers:
+IPAddress timeServer(129, 6, 15, 28); // time-a-g.nist.gov    NIST, Gaithersburg, Maryland
+// IPAddress timeServer(132, 163, 97, 1); // time-a-wwv.nist.gov    WWV, Fort Collins, Colorado
+// IPAddress timeServer(132, 163, 96, 1); // time-a-b.nist.gov    NIST, Boulder, Colorado
+
+// const int timeZone = -6;     // Central Standard Time
+// const int timeZone = -5;     // Central Daylight Time
+const int timeZone = 0;         // Gives the actual accurate time. No shifting for time zones necessary.
+
+
+EthernetUDP Udp;
+unsigned int localPort = 8888;  // local port to listen for UDP packets
+
 
 String input = "";                                          //legacy code
 String data = "";                                           //legacy code
@@ -71,13 +86,23 @@ unsigned long previous_millis = 0;                          //legacy code
 void setup_ethernet() {
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed to obtain an IP address using DHCP");
-    while(true);
+
+
+    while(true);      // we cant have it loop without condition-less forever. 
+
   }
   else { 
     Serial.println("IP address obtained");
     Serial.print("IP address is at: ");
     Serial.println(Ethernet.localIP());
   }  
+}
+
+void setup_NTP() {
+  Udp.begin(localPort);
+  Serial.println("Waiting for time sync.");
+  setSyncProvider(getNtpTime);
+  setSyncInterval(86400);
 }
 
 //Choose the server to be used as a broker for communication
@@ -178,6 +203,8 @@ void setup() {
 
   setup_ethernet();
   delay(2000);
+  setup_NTP();                                    // Time is now synched with NTP
+  delay(2000);
   setup_broker();                                 // The Teensy now sets which server it will use as a broker
   delay(2000);
   commence_connection();                          // The Teensy now attempts to connect to the server
@@ -195,7 +222,7 @@ void loop() {
     // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
 
     if (Serial1.available()) {
-        data = "";    // initializing the final single string of data to be sent to database and/or saved to SD
+        data = String(now()) + "\t";    // initializing the final single string of data to be sent to database and/or saved to SD
 
         // Need this char later on because Serial.read() sends text as ASCII decimal.
         // Setting char character = Serial.read() will "typecast" the output as a char.
@@ -245,3 +272,59 @@ void clearSerial1Buffer() {
     Serial1.read();
   }
 }
+
+
+// NTP Functions
+const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+
+time_t getNtpTime()
+{
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  Serial.println("Transmit NTP Request");
+  sendNTPpacket(timeServer);
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.println("Received NTP Response");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      Serial.print("NUMBER: ");
+      Serial.println(secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR);
+      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
+
+// send an NTP request to the time server at the given address
+void sendNTPpacket(IPAddress &address)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:                 
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
+}
+
+
