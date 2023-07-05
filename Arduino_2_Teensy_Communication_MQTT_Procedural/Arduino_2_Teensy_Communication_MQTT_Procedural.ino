@@ -32,6 +32,8 @@
 #include <PubSubClient.h>       //Teensy MQTT implementation library
 #include <SD.h>
 
+#define MQTT_MAX_PACKET_SIZE 3000; // Set the maximum number of bytes that can be sent as MQTT payload. 
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 //              Ethernet set up including MAC address for Gromit
@@ -133,7 +135,6 @@ void commence_connection() {
   }
 }
 
-// We increased the MQTT_MAX_PACKET_SIZE in the PubSubClient.h file to 3000
 void publish_string(String topic, String data) {
   char topic_array[topic.length()* 2];
   topic.toCharArray(topic_array, sizeof(topic_array));
