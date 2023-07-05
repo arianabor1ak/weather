@@ -32,6 +32,7 @@
 #include <PubSubClient.h>       //Teensy MQTT implementation library
 #include <SD.h>
 
+// Manually changed in the PubSubClient.h file because the #define didn't seem to work.
 #define MQTT_MAX_PACKET_SIZE 3000; // Set the maximum number of bytes that can be sent as MQTT payload. 
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -94,13 +95,25 @@ void setup_ethernet() {
 }
 
 // Syncs clock with time from NTP server listed in VARIABLES USED.
-// It attepmts to sync to the NTP server ever 24 hrs(86400 secs, 86400000 ms).
 void setup_NTP() {
   Udp.begin(localPort);
   Serial.println("Waiting for time sync.");
-  setSyncProvider(getNtpTime);
+  setSyncProvider(getTeensy3Time);    // Set TimeLib to use the internal RTC
+  time_t t = getNtpTime();
+  Teensy3Clock.set(t);                // Set the RTC using NTP server
+  setTime(t); 
   timeOfLatestSync = now();
-  // setSyncInterval(86400000);
+  if (timeStatus()!= timeSet) {
+    Serial.println("Unable to sync with the RTC");
+  } else {
+    Serial.println("RTC has set the system time");
+  }
+}
+
+// Function for getting the time from RTC
+time_t getTeensy3Time()
+{
+  return Teensy3Clock.get();
 }
 
 //Choose the server to be used as a broker for communication
@@ -140,8 +153,6 @@ void publish_string(String topic, String data) {
   topic.toCharArray(topic_array, sizeof(topic_array));
   char data_array[data.length() * 2];
   data.toCharArray(data_array, sizeof(data_array));
-  Serial.print("data_array: ");
-  Serial.println(data_array);
   Serial.print("Publishing Check...");
   Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
 }
@@ -201,7 +212,7 @@ void setup() {
 
   setup_ethernet();
   delay(2000);
-  setup_NTP();                                    // Time is now synched with NTP
+  setup_NTP();                                    // RTC and TimeLib is now synched with NTP
   delay(2000);
   setup_broker();                                 // The Teensy now sets which server it will use as a broker
   delay(2000);
@@ -221,7 +232,6 @@ void loop() {
       // Checks if Ethernet connection is still good(and updates IP from DHCP)
       // then syncs the time to NTP if the latest sync was more than 12 hrs ago. 
       // Maybe we should have the MQTT connection stuff inside here as well, to check for internet connection first?
-      Serial.println("ethReturnByte: " + String(ethReturnByte));
       if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
         if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs *also unsure if int() is necessary
           setup_NTP();
@@ -260,16 +270,6 @@ void loop() {
             data.concat(String(character));
           }
         }
-
-        // //TESTING
-        // int i = 0;
-        // while (i < 100) {                    
-        //   while(Serial1.available()) {      
-        //     character = Serial1.read();
-        //     data.concat(String(character));
-        //     i++;
-        //   }
-        // }
 
         // We may restructure this code using interrupts to always read from SD,
         // and interrupt every 30 seconds to request and write data to the SD card. 
@@ -319,7 +319,7 @@ time_t getNtpTime()
       secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long)packetBuffer[43];
-      Serial.print("NUMBER: ");
+      Serial.print("TIME: ");
       Serial.println(secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR);
       return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
     }
