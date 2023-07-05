@@ -49,8 +49,6 @@ PubSubClient mqttClient(ethClient);
 
 String topic = "CarletonWeatherTower";
 
-int SDtestFileName = 99000;  // Temporary variable to name SD card files. Remove after timestamping implementation.
-
 // NTP Servers (2 alternatives are listed. It may be possible to connect to ntp pool and not worry about which specific ip is available): 
 IPAddress timeServer(129, 6, 15, 28); // time-a-g.nist.gov    NIST, Gaithersburg, Maryland
 // IPAddress timeServer(132, 163, 97, 1); // time-a-wwv.nist.gov    WWV, Fort Collins, Colorado
@@ -60,9 +58,9 @@ IPAddress timeServer(129, 6, 15, 28); // time-a-g.nist.gov    NIST, Gaithersburg
 // const int timeZone = -5;     // Central Daylight Time
 const int timeZone = 0;         // Gives the actual accurate time. No shifting for time zones necessary.
 
-
 EthernetUDP Udp;
 unsigned int localPort = 8888;  // local port to listen for UDP packets
+int timeOfLatestSync = 0;       // Used to sync clock to NTP server if latest sync was more than 24 hrs ago. 
 
 
 String input = "";                                          //legacy code
@@ -101,7 +99,8 @@ void setup_NTP() {
   Udp.begin(localPort);
   Serial.println("Waiting for time sync.");
   setSyncProvider(getNtpTime);
-  setSyncInterval(86400);
+  timeOfLatestSync = now();
+  // setSyncInterval(86400);
 }
 
 //Choose the server to be used as a broker for communication
@@ -150,19 +149,18 @@ void publish_string(String topic, String data) {
 // ** The "".txt" is added inside the function
 void saveDataToSD(String dataString, String fileName) {
   fileName += ".txt";
-  File savedData = SD.open(fileName.c_str(), FILE_WRITE); //should we name the file with the time/date?
+  File savedData = SD.open(fileName.c_str(), FILE_WRITE);
   if (savedData) {
     savedData.println(dataString);
     savedData.close();
-    Serial.print("Data saved to SD card in file: ");
-    Serial.println(fileName); 
+    Serial.print("Data saved to SD card in file: " + fileName);
   } else {
-    Serial.println("error opening file");
+    Serial.println("error opening file:" + fileName);
   } 
 }
 
 // Reads data from the SD card from the specified file name 
-// ** The specificed file name should not include the file type, only the name. 
+// ** The parameter fileName should not include the file type, only the name of the file. 
 // ** It is assumed all files on the SD card are .txt files.
 // Returns void for now. Could return the string from the file or
 // could return void and publish the string within this function.
@@ -171,15 +169,14 @@ void readFromSD(String fileName) {
   fileName += ".txt";
   File fileSD = SD.open(fileName.c_str(), FILE_READ);
   if (fileSD) {
-    Serial.println("Reading from file:" + fileName);
+    Serial.println("Reading from file: " + fileName);
     // read from the file until there's nothing else in it:
     while (fileSD.available()) {
     	returnStr += fileSD.readString();
     }
     fileSD.close();
   } else {
-  	// if the file didn't open, print an error:
-    Serial.println("error opening file");
+    Serial.println("error opening file: " + fileName);
   }
 }
 
@@ -221,8 +218,6 @@ void loop() {
     // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
 
     if (Serial1.available()) {
-        data = String(now()) + "\t";    // initializing the final single string of data to be sent to database and/or saved to SD
-
         // Need this char later on because Serial.read() sends text as ASCII decimal.
         // Setting char character = Serial.read() will "typecast" the output as a char.
         char character = 'a';
@@ -232,17 +227,24 @@ void loop() {
         // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
         while (character != 'S')  {                                   
           character = Serial1.read();       
-        } 
-        data.concat(character);     // Adds the 'S' that was detetected to the data string.        
+        }
+
+        // Records the time of when the 'S' is read
+        String timeOfNewData = String(now());
+        data = timeOfNewData + "\t";               
+        data.concat(character);                         // Adds the 'S' that was detetected to the data string.        
 
         // Reads from Serial1, byte by byte, and adds the char that was read
         // until the terminating char '@' is read. 
-        while (character != '@') {                    // ASCII code for '@' = 64
+        while (character != '@') {                      // ASCII code for '@' = 64
           while(Serial1.available()) {      
             character = Serial1.read();
             data.concat(character);
           }
         }
+
+        saveDataToSD(data, timeOfNewData); 
+        readFromSD(timeOfNewData);
 
         Serial.print("Data: ");
         Serial.println(data);
@@ -253,14 +255,7 @@ void loop() {
           commence_connection();          
         }
         Serial.println("Publication topic: " + topic); 
-        publish_string(topic, data);
-
-        // SDtestFileName FOR TESTING ONLY, replace with RTC timestamp once implemented.
-        // readFromSD FOR TESTING ONLY. We may restructure code using interrupts to always read from SD,
-        // and interrupt every 30 seconds to request and write data to the SD card. 
-        saveDataToSD(data, String(SDtestFileName)); 
-        readFromSD(SDtestFileName);
-        SDtestFileName += 1;      
+        publish_string(topic, data);      
     }
 }
 
