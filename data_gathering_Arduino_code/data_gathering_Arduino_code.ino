@@ -116,22 +116,16 @@ String getData(String letters){
   char byte = 'a';
   Serial.print(letters);
 
-  while (byte != '\r') {
+  while (byte != '\r') {  //read all the data until a carriage return
     while (Serial.available()) {
       byte = Serial.read();
+      if (byte == '\r')   //don't add byte to the data if it is a carriage return
+      {
+        break;
+      }
       data += byte;
     }
   }
-
-  // while (millis() < current_time + 5000) //Loop for 5 seconds to make sure all the data is being read from the buffer
-  // {
-  //   while (Serial.available()) 
-  //   {
-  //     byte = Serial.read(); //read byte by byte
-  //     data += byte;
-  //   }
-  // }
-  
   clearSerialBuffer();
   return data;
 }
