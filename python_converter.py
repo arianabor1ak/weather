@@ -61,7 +61,7 @@ def create_raw_data_array(raw_data_string):
     raw_data_array = raw_data_string.split('\t')
     return raw_data_array
 
-#utility function for convert_data
+#utility function for conversion
 #performs SQL command
 # should be encapsulated by weather_db_wrapper
 def insert_into_formatted_data(index, value):
@@ -75,6 +75,12 @@ def insert_into_formatted_data(index, value):
     except Exception as err:
         print(f"Error: '{err}'")
 
+def conversion(field, raw_data_array):
+    find_field = ConversionObjects.field_dict[field] #use the number to index which geiger object to create
+    converted = ConversionObjects.find_field #not sure if this will work #supposed to create instance of specific geiger object subclass
+    converted_data = converted.format(raw_data_array[field]) #perform the conversion
+    insert_into_formatted_data(field, converted_data) #insert the converted value into the database
+
 def convert_data(raw_data_array):
     # create the row by defaulting column values to NULL
     # update each column after the formatting takes place
@@ -84,44 +90,37 @@ def convert_data(raw_data_array):
             #extrapolate into 10 specified fields
             #store in database
             field += 1
-        elif raw_data_array[field] == "S-": #bottom section data
+        if raw_data_array[field] == "S-": #bottom section data
             #check if field == 1
             field += 1
             while raw_data_array[field] != "1-": #probably don't need a while loop? somehow index sql columns?
-                #format field
-                #INSERT INTO (geiger_ticks) - call insert_into_formatted_data(field, raw_data_array[field]); 
-					# field should correspond to geiger_ticks and so on
-                #insert_into_formatted_data(field, converted)
+                                                #need to include index number "and field < 160" or something
+                conversion(field, raw_data_array)
                 field += 1
-        elif raw_data_array[field] == "1-": #top mux data
+        if raw_data_array[field] == "1-": #top mux data
             field += 1
             while raw_data_array[field] != "2-":
-                #format field
-                #store in database
+                conversion(field, raw_data_array)
                 field += 1
-        elif raw_data_array[field] == "2-": #top sway sensor data
+        if raw_data_array[field] == "2-": #top sway sensor data
             field += 1
             while raw_data_array[field] != "3-":
-                #format field
-                #store in database
+                conversion(field, raw_data_array)
                 field += 1
-        elif raw_data_array[field] == "3-": #top flux data
+        if raw_data_array[field] == "3-": #top flux data
             field += 1
             while raw_data_array[field] != "4-":
-                #format field
-                #store in database
+                conversion(field, raw_data_array)
                 field += 1
-        elif raw_data_array[field] == "4-": #top triaxial magnetometer
+        if raw_data_array[field] == "4-": #top triaxial magnetometer
             field += 1
             while raw_data_array[field] != "5-": #might have to change to updated future field
-                #format field
-                #store in database
+                conversion(field, raw_data_array)
                 field += 1
-        elif raw_data_array[field] == "5-": #top future data, will probably be changed
+        if raw_data_array[field] == "5-": #top future data, will probably be changed
             field += 1
             while raw_data_array[field] != "@":
-                #format field
-                #store in database
+                conversion(field, raw_data_array)
                 field += 1
         # else:
         #     #throw an error, data not in the correct format
