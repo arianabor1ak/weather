@@ -129,22 +129,18 @@ void setup_broker() {
 //connects to the broker when connection is lost which occurs at random sometimes.
 //After connection is successful, the string is published.
 void commence_connection() {
-  while (!mqttClient.connected()) { // Loop until we're reconnected
-    Serial.print("Attempting MQTT connection...");
-    String clientId = "TeensyClient-"; // Create a random client ID
-    clientId += String(random(0xffff), HEX);
-    if (mqttClient.connect(clientId.c_str())) { // Attempt to connect
-      Serial.println("Connected");
-      Serial.print("Status code after connecting to broker server: "); // Once connected, publish an announcement...
-      Serial.println(mqttClient.state());
-      // mqttClient.publish("test", "I'm publishing");
-    } 
-    else {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000); // Wait 5 seconds before retrying
-    }
+  Serial.print("Attempting MQTT connection...");
+  String clientId = "TeensyClient-"; // Create a random client ID
+  clientId += String(random(0xffff), HEX);
+  if (mqttClient.connect(clientId.c_str())) { // Attempt to connect
+    Serial.println("Connected");
+    Serial.print("Status code after connecting to broker server: "); // Once connected, publish an announcement...
+    Serial.println(mqttClient.state());
+    // mqttClient.publish("test", "I'm publishing");
+  } 
+  else {
+    Serial.print("failed, rc=");
+    Serial.print(mqttClient.state());
   }
 }
 
@@ -157,18 +153,47 @@ void publish_string(String topic, String data) {
   Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
 }
 
-// Saves the input data string to an SD card as a .txt file
+void setup_SD() {
+  Serial.print("Initializing SD card...");     
+  if (!SD.begin(BUILTIN_SDCARD)) {
+    Serial.println("SD initialization failed!");
+    while (1);   // If the SD card initialization fails, the code effectively stops here. 
+  }
+  if (!SD.exists("unpublished")) {
+    SD.mkdir("unpublished");
+  }
+  if (!SD.exists("published")) {
+    SD.mkdir("published");
+  }
+  Serial.println("SD initialization done.");
+}
+
+// Saves the input data string to an SD card as a .txt file inside the folder "unpublished"
 // ** The specificed file name should not include the file type (.txt), only the name.
 // ** The "".txt" is added inside the function
-void saveDataToSD(String dataString, String fileName) {
-  fileName += ".txt";
-  File savedData = SD.open(fileName.c_str(), FILE_WRITE);
+void unpublishedToSD(String dataString, String fileName) {
+  String filePath = "unpublished/" + fileName + ".txt";
+  File savedData = SD.open(filePath.c_str(), FILE_WRITE);
   if (savedData) {
     savedData.println(dataString);
     savedData.close();
-    Serial.println("Data saved to SD card in file: " + fileName);
+    Serial.println("Unpublished data saved to SD card in file: " + filePath);
   } else {
-    Serial.println("error opening file:" + fileName);
+    Serial.println("error opening file:" + filePath);
+  } 
+}
+
+// Saves the input data string to an SD card as a .txt file inside the folder "published"
+// ** Same file name specifics as unpublishedToSD
+void publishedToSD(String dataString, String fileName) {
+  String filePath = "published/" + fileName + ".txt";
+  File savedData = SD.open(filePath.c_str(), FILE_WRITE);
+  if (savedData) {
+    savedData.println(dataString);
+    savedData.close();
+    Serial.println("Published data saved to SD card in file: " + filePath);
+  } else {
+    Serial.println("error opening file:" + filePath);
   } 
 }
 
@@ -200,43 +225,23 @@ void setup() {
   Serial.begin(9600);                           // baud rate for the teensy serial monitor
   // while (!Serial);                           // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
-  delay(2000);
-
-  Serial.print("Initializing SD card...");     
-  if (!SD.begin(BUILTIN_SDCARD)) {
-    Serial.println("SD initialization failed!");
-    while (1);                                    // If the SD card initialization fails, the code effectively stops here. 
-  }
-  Serial.println("SD initialization done."); 
-  delay(2000);
-
+  delay(500);
+  setup_SD();                           // SD card and folders setup
+  delay(500);
   setup_ethernet();
   delay(2000);
-  setup_NTP();                                    // RTC and TimeLib is now synched with NTP
+  setup_NTP();                          // RTC and TimeLib is now synched with NTP
+  delay(1000);
+  setup_broker();                       // The Teensy now sets which server it will use as a broker
   delay(2000);
-  setup_broker();                                 // The Teensy now sets which server it will use as a broker
-  delay(2000);
-  commence_connection();                          // The Teensy now attempts to connect to the server
+  commence_connection();                // The Teensy now attempts to connect to the server
 }
 
 //Sends signal to get data every 30 seconds
 void loop() {
-    // Returns 1 or 3 if Ethernet connection is not maintained. 
-    // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
-    byte ethReturnByte = Ethernet.maintain(); 
-
     unsigned long current_millis = millis();
     if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
       previous_millis = current_millis;                   // reset the millisecond tracker to the current time
-
-      // Checks if Ethernet connection is still good(and updates IP from DHCP)
-      // then syncs the time to NTP if the latest sync was more than 12 hrs ago. 
-      // Maybe we should have the MQTT connection stuff inside here as well, to check for internet connection first?
-      if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
-        if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs *also unsure if int() is necessary
-          setup_NTP();
-        } 
-      }
 
       clearSerial1Buffer();       
       Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
@@ -271,21 +276,38 @@ void loop() {
           }
         }
 
-        // We may restructure this code using interrupts to always read from SD,
-        // and interrupt every 30 seconds to request and write data to the SD card. 
-        saveDataToSD(data, timeOfNewData); 
-        readFromSD(timeOfNewData);
-
         Serial.print("Data: ");
         Serial.println(data);
 
-        // mqttClient.publish("test", "received data");
-        if (!mqttClient.connected()) {
-        // Serial.println("I'm not connected");
-          commence_connection();          
+        // Returns 1 or 3 if Ethernet connection is not maintained. 
+        // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
+        byte ethReturnByte = Ethernet.maintain(); 
+        // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
+        if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
+          // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
+          if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs 
+            setup_NTP();
+          }
+          // Since ethernet is available, attempts to publish data via mqtt protocol.
+          commence_connection();
+          if (!mqttClient.connected()) {    // if first connection fails, try only 1 more time.
+            commence_connection();
+          }
+          if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
+            Serial.println("MQTT not connected");
+            unpublishedToSD(data, timeOfNewData);
+          }
+          else {    
+            publishedToSD(data, timeOfNewData);
+            publish_string(topic, data);
+            Serial.println("Publication topic: " + topic); 
+          }
         }
-        Serial.println("Publication topic: " + topic); 
-        publish_string(topic, data);      
+        // If ethReturnByte return 1 or 3:
+        else {
+          Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
+          unpublishedToSD(data, timeOfNewData);
+        }
     }
 }
 
@@ -296,7 +318,6 @@ void clearSerial1Buffer() {
     Serial1.read();
   }
 }
-
 
 // NTP Functions
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
