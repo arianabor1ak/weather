@@ -1,6 +1,17 @@
-CREATE TABLE formatted_data_table (
+CREATE TABLE formatted_data (
 	id BIGSERIAL PRIMARY KEY NOT NULL,
 	datetime_utc TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAUlT CURRENT_TIMESTAMP(0),                -- internal representation of time measurement was saved
+
+	unix_time DOUBLE PRECISION,
+	u_year DOUBLE PRECISION,
+	u_month DOUBLE PRECISION,
+	u_day DOUBLE PRECISION,
+	u_hour DOUBLE PRECISION,
+	u_minute DOUBLE PRECISION,
+	u_second DOUBLE PRECISION,
+	clk_source DOUBLE PRECISION,
+	stardate DOUBLE PRECISION,
+	future_time DOUBLE PRECISION,
 
 	geiger_ticks DOUBLE PRECISION,
 	geiger_high_volts DOUBLE PRECISION,
@@ -376,7 +387,4 @@ CREATE TABLE formatted_data_table (
 	Y37 DOUBLE PRECISION,
 	Y38 DOUBLE PRECISION,
 	Y39 DOUBLE PRECISION,
-	Y40 DOUBLE PRECISION,
-
-	
-);
+	Y40 DOUBLE PRECISION);
