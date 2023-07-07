@@ -140,7 +140,7 @@ void commence_connection() {
   } 
   else {
     Serial.print("failed, rc=");
-    Serial.print(mqttClient.state());
+    Serial.println(mqttClient.state());
   }
 }
 
@@ -218,6 +218,30 @@ void readFromSD(String fileName) {
   }
 }
 
+// Moves(copies and deletes original) one file(passed as a param) to the 
+// folder named "published" and publishes the data from that file to mqtt client. 
+// ** Assumes mqtt connection has been established.
+// ** This function assumes sourceFile param ends in .txt
+void processUnpublishedFile (File unpublishedFile) { 
+  Serial.println("unpublishedFile name = " + String(unpublishedFile.name()));
+  String destPath = "published/" + String(unpublishedFile.name());;
+  File destFile = SD.open(destPath.c_str(), FILE_WRITE);
+  String fileData = "";
+  while (unpublishedFile.available()) {
+    fileData += unpublishedFile.readString();
+    destFile.println(fileData);
+  }
+  destFile.close();
+
+  //publish the data from the moved file
+  publish_string(topic, fileData);
+  // remove the file from the unpublished folder
+  String unpublishedFilePath = "unpublished/" + String(unpublishedFile.name());
+  SD.remove(unpublishedFilePath.c_str());
+  Serial.println("Finished moving/publishing file.");
+
+}
+
 // String request_data() {} //is this necessary? how is this different from callback?
 
 void setup() {
@@ -239,87 +263,110 @@ void setup() {
 
 //Sends signal to get data every 30 seconds
 void loop() {
-    unsigned long current_millis = millis();
-    if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
-      previous_millis = current_millis;                   // reset the millisecond tracker to the current time
+  time_t timeOfNewData;   // var that holds the time of when data was received by the Teensy from the Arduino.
+  // unsigned long current_millis = millis();
+  // if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
+  //   previous_millis = current_millis;                   // reset the millisecond tracker to the current time
 
-      clearSerial1Buffer();       
-      Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
-      Serial.println("Requesting data from the arduino");
+  //   clearSerial1Buffer();       
+  //   Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
+  //   Serial.println("Requesting data from the arduino");
+  // }
+  // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
+
+  unsigned long millisOfRequest = millis();
+  clearSerial1Buffer();       
+  Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
+  Serial.println("Requesting data from the arduino");
+  while(!Serial1.available()); // testing. This just waits until there is something in the serial1 buffer
+  if (Serial1.available()) {
+    // Need this char later on because Serial.read() sends text as ASCII decimal.
+    // Setting char character = Serial.read() will "typecast" the output as a char.
+    char character = 'a';
+
+    // Loops through Serial1 buffer until 'S'(the starting char) is detected.
+    // Maybe this detection code is unessary but the
+    // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
+    while (character != 'S')  {                                   
+      character = Serial1.read();       
     }
-    // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
 
-    if (Serial1.available()) {
-        // Need this char later on because Serial.read() sends text as ASCII decimal.
-        // Setting char character = Serial.read() will "typecast" the output as a char.
-        char character = 'a';
+    // Records the time of when the 'S' is read
+    timeOfNewData = now();
+    data = String(timeOfNewData) + "\t";   
 
-        // Loops through Serial1 buffer until 'S'(the starting char) is detected.
-        // Maybe this detection code is unessary but the
-        // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
-        while (character != 'S')  {                                   
-          character = Serial1.read();       
-        }
+    data.concat(String(character));                 // Adds the 'S' that was detetected to the data string.        
 
-        // Records the time of when the 'S' is read
-        String timeOfNewData = String(now());
-        data = timeOfNewData + "\t";   
-
-        data.concat(String(character));                         // Adds the 'S' that was detetected to the data string.        
-
-        // Reads from Serial1, byte by byte, and adds the char that was read
-        // until the terminating char '@' is read. 
-        while (character != '@') {                      // ASCII code for '@' = 64
-          while(Serial1.available()) {      
-            character = Serial1.read();
-            data.concat(String(character));
-          }
-        }
-
-        Serial.print("Data: ");
-        Serial.println(data);
-
-        // Returns 1 or 3 if Ethernet connection is not maintained. 
-        // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
-        byte ethReturnByte = Ethernet.maintain(); 
-        // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
-        if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
-          // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
-          if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs 
-            setup_NTP();
-          }
-          // Since ethernet is available, attempts to publish data via mqtt protocol.
-          commence_connection();
-          if (!mqttClient.connected()) {    // if first connection fails, try only 1 more time.
-            commence_connection();
-          }
-          if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
-            Serial.println("MQTT not connected");
-            unpublishedToSD(data, timeOfNewData);
-          }
-          else {    
-            publishedToSD(data, timeOfNewData);
-            publish_string(topic, data);
-            Serial.println("Publication topic: " + topic); 
-          }
-        }
-        // If ethReturnByte return 1 or 3:
-        else {
-          Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
-          unpublishedToSD(data, timeOfNewData);
-        }
+    // Reads from Serial1, byte by byte, and adds the char that was read
+    // until the terminating char '@' is read. 
+    while (character != '@') {                      // ASCII code for '@' = 64
+      while(Serial1.available()) {      
+        character = Serial1.read();
+        data.concat(String(character));
+      }
     }
+
+    Serial.print("Data: ");
+    Serial.println(data);
+
+    // Returns 1 or 3 if Ethernet connection is not maintained. 
+    // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
+    byte ethReturnByte = Ethernet.maintain(); 
+    // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
+    if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
+      // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
+      if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs 
+        setup_NTP();
+      }
+      // Since ethernet is available, attempts to publish data via mqtt protocol.
+      commence_connection();
+      if (!mqttClient.connected()) {    // if first connection fails, try only 1 more time.
+        commence_connection();
+      }
+      if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
+        Serial.println("MQTT not connected");
+        unpublishedToSD(data, timeOfNewData);
+      }
+      else {    
+        publishedToSD(data, timeOfNewData);
+        publish_string(topic, data);
+        Serial.println("Publication topic: " + topic); 
+      }
+    }
+    // If ethReturnByte return 1 or 3:
+    else {
+      Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
+      unpublishedToSD(data, timeOfNewData);
+    }
+  }
+  // This section attempts to publish data that was not published but stored in the SD/
+  // It does this until it has been 30 seconds since the last data request to arduino.
+  File unpublishedFolder = SD.open("unpublished/");
+  while ((millis() < (millisOfRequest + 30000))) {
+    File unpublishedFile = unpublishedFolder.openNextFile();                  
+    if (unpublishedFile) {                                                    // Checks if folder contains any files
+      byte ethReturnByte = Ethernet.maintain();                               
+      if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {   // Checks for good ethernet connection
+        commence_connection();                                                 
+        if (mqttClient.connected()) {                                         // Checks for good mqtt client connection
+          processUnpublishedFile(unpublishedFile);
+          unpublishedFile.close();
+        }
+      }
+    }
+    delay(2000); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
+  }
+  unpublishedFolder.close();
 }
 
-// Reads all of, and therefore effectively 
-// empties, the Serial1 buffer. 
+// Clears the Serial1 buffer. 
 void clearSerial1Buffer() {
   while (Serial1.available()) {
     Serial1.read();
   }
 }
 
-// NTP Functions
+// NTP Functions. Copied straight out of /Examples/Time/TimeNTP.ino
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
