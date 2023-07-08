@@ -7,7 +7,6 @@ class Weather_DB:
 	def __init__(self):
 		self.connection = None
 		self.cursor = None
-		self.null_array = []
 
 	"""
 	------------------------------------------DATABASE CONNECTION------------------------------------------
@@ -44,7 +43,7 @@ class Weather_DB:
 	------------------------------------------DATABASE INSERTION------------------------------------------
 	"""
 
-	# Insert the newly recieved master_string into the raw data database
+	# Insert the newly recieved master_string into the raw_data table
 	# Add error handling
 	def insert_master_string(self, master_string):
 		self.db_connect()
@@ -52,13 +51,10 @@ class Weather_DB:
 		self.db_commit()
 		self.db_close()
 
-	# Creates a new row and inserts the Unix time into the row
+	# Creates a new row and inserts the Unix time into a row in formatted_data
 	def insert_first(self, value):
 		self.db_connect()
 		try:
-			# Rough sketch of what query should be
-			# Need to figure out how to access correct column with index
-			# Need to know id of row to later insert into raw_data
 			command = """
 			INSERT INTO formatted_data (unix_time)
 			VALUES (%s)
@@ -77,35 +73,32 @@ class Weather_DB:
 	def insert_formatted_data(self, column_name, value, row_id):
 		self.db_connect()
 		try:
-			# Rough sketch of what query should be
-			# Need to figure out how to access correct column with index
-			# Need to know id of row to later insert into raw_data
 			command = """
-			UPDATE formatted_data (%s)
-			VALUES (%s)
+			UPDATE formatted_data
+			SET %s = %s
 			WHERE id = %s
 			"""
 			self.cursor.execute(command, (AsIs(column_name), value, row_id,))
 			self.db_commit()
 		except Exception as err:
 			print(f"Error: '{err}'")
-		self.db_close()
+		finally:
+			self.db_close()
 
 	# Inserts the formatted_id into the corresponding raw_data row
 	def insert_formatted_id(self, raw_id, formatted_id):
 		self.db_connect()
 		try:
-			# Rough sketch of what the query should be
 			command = """
 			UPDATE raw_data
 			SET formatted_id = %s
 			WHERE raw_data.id = %s;
 			"""
 			self.cursor.execute(command, (formatted_id, raw_id,))
+			self.db_commit()
 		except Exception as err:
 			print(f"Error: '{err}'")
 		finally:
-			self.db_commit()
 			self.db_close()
 
 	"""
@@ -122,12 +115,15 @@ class Weather_DB:
 			WHERE formatted_id IS NULL;
 			"""
 			self.cursor.execute(query)
-			self.null_array = self.cursor.fetchall()
+			null_array = self.cursor.fetchall()
+			self.db_close()
+			return null_array
 		except Exception as err:
 			print(f"Error: '{err}'")
 		finally:
 			self.db_close()
 
+	# Retrieve the master string from a specified row in the raw_data table
 	def get_master_string(self, id):
 		self.db_connect()
 		try:
@@ -161,61 +157,10 @@ class Weather_DB:
 		except Exception as err:
 			print(f"Error: '{err}'")
 			self.db_close()
-		
-
-	# Retrieves the master string from the last row from the raw_data_database to
-	# be formatted later on
-	# The logic of this should be changed; instead of retrieving the last row,
-	# retrieve any rows in the database that have a NULL character in formatted_id
-	def get_last_row(self):
-		self.db_connect()
-		try:
-			query = """
-			SELECT raw_master_string
-			FROM raw_data
-			ORDER BY id DESC LIMIT 1;
-			"""
-			self.cursor.execute(query)
-			self.db_commit()
-			result = self.cursor.fetchone()
-			self.db_close()
-			return result[0]
-		except Exception as err:
-			print(f"Error: '{err}'")
-
-			self.db_close()
-
-	# Prints all rows in the table
-	def retrieve_raw_data(self):
-		self.db_connect()
-		self.cursor.execute("SELECT * FROM raw_data")
-		rows = self.cursor.fetchall() #maybe need to have some error handling if there is nothing in the table?
-		for row in rows:
-			print(f"id: {row[0]}, timestamp: {row[1]}, master string: {row[2]}")
-		self.db_close()
-
-	# retrieves all the master strings in the database
-	def get_all(self):
-		self.db_connect()
-		try:
-			query = """
-			SELECT raw_master_string
-			FROM raw_data
-			ORDER BY id DESC;
-			"""
-			self.cursor.execute(query)
-			self.db_commit()
-			result = self.cursor.fetchall()
-			self.db_close()
-			return result
-		except Exception as err:
-			print(f"Error: '{err}'")
-		self.db_close()
 
 def main():
 	weather_db = Weather_DB()
 	weather_db.find_null()
-	print(weather_db.null_array)
 
 if __name__ == "__main__":
 	main()
