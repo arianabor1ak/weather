@@ -2,7 +2,6 @@ from unicodedata import decimal
 
 
 class ConversionObject:
-	field_dict = {}
 
 	def __init__(self, given_data_name, given_data_type, given_typical_lower_limit, given_typical_upper_limit, given_integer_count, given_decimal_count, given_lower_limit, given_upper_limit):
 		self.data_name = given_data_name
@@ -15,17 +14,37 @@ class ConversionObject:
 		self.upper_limit = given_upper_limit
 	
 	def __str__(self): 
-		print("\n---------------" + self.data_name + "---------------\n" +
-		"Data Type: " + self.data_type + "\n" +
-		"Typical Lower Limit: " + str(self.typical_lower_limit) + "\n" +
-		"Typical Upper Limit: " + str(self.typical_upper_limit) + "\n" +
-		"Number of Integers: "  + str(self.integer_count) + "\n" +
-		"Number of Integers After Decimal: " + str(self.decimal_count) + "\n" +
-		"Sensors Lower Limit: " + str(self.lower_limit) + "\n" +
-		"Sensors Upper Limit: " + str(self.upper_limit) + "\n")
+		self_string =  "\n---------------" + self.data_name + "---------------\n" + \
+		"Data Type: " + self.data_type + "\n" + \
+		"Typical Lower Limit: " + str(self.typical_lower_limit) + "\n" + \
+		"Typical Upper Limit: " + str(self.typical_upper_limit) + "\n" + \
+		"Number of Integers: "  + str(self.integer_count) + "\n" + \
+		"Number of Integers After Decimal: " + str(self.decimal_count) + "\n" + \
+		"Sensors Lower Limit: " + str(self.lower_limit) + "\n" + \
+		"Sensors Upper Limit: " + str(self.upper_limit) + "\n"
+		return self_string
 
 	def format(self, rawdata):
 		converted = float(rawdata)
+		return converted
+	
+class unix_time(ConversionObject):
+	def __init__(self):
+		data_name = "unix_time"
+		# change all these:
+		# data_type = "dec"
+		# data_typical_lower_limit = 100
+		# data_typical_upper_limit = 120
+		# integer_count = 3
+		# decimal_count = 0
+		# sensor_lower_limit = 5
+		# sensor_upper_limit = 2000
+		# self.index = 1
+		ConversionObject.__init__(self, data_name, data_type, data_typical_lower_limit, data_typical_upper_limit, integer_count, decimal_count, sensor_lower_limit, sensor_upper_limit)
+
+	def format(self, rawdata):
+		#change this:
+		converted = int(rawdata)
 		return converted
 
 #===================================================================================================================
@@ -38,7 +57,7 @@ class ConversionObject:
 # Typical background levels are around 100-120.
 # Requires no conversion or response.
 
-class GeigerTicks(ConversionObject):
+class geiger_ticks(ConversionObject):
 	def __init__(self):
 		data_name = "geiger_ticks"
 		data_type = "dec"
@@ -50,7 +69,6 @@ class GeigerTicks(ConversionObject):
 		sensor_upper_limit = 2000
 		self.index = 1
 		ConversionObject.__init__(self, data_name, data_type, data_typical_lower_limit, data_typical_upper_limit, integer_count, decimal_count, sensor_lower_limit, sensor_upper_limit)
-		ConversionObject.field_dict[2] = GeigerTicks()
 
 	def format(self, rawdata):
 		converted = int(rawdata)
@@ -62,7 +80,7 @@ class GeigerTicks(ConversionObject):
 # To convert from raw voltage, divide by 1024, multiply by 5, and multiply by 250.
 # The result is in volts.
 
-class GeigerHighVolts(ConversionObject):
+class geiger_high_volts(ConversionObject):
 	def __init__(self):
 		data_name = "geiger_high_volts"
 		data_type = "dec"
