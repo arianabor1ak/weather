@@ -278,8 +278,9 @@ void loop() {
   clearSerial1Buffer();       
   Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
   Serial.println("Requesting data from the arduino");
-  while(!Serial1.available()); // testing. This just waits until there is something in the serial1 buffer
+  while(!Serial1.available() && (millis() < millisOfRequest + 20000)); // && (millis() < millisOfRequest + 20000) This just waits until there is something in the serial1 buffer or 20 secs has passed with nothing in serial1 buffer.
   if (Serial1.available()) {
+    // Serial.println("Serial1 is available!"); // testing
     // Need this char later on because Serial.read() sends text as ASCII decimal.
     // Setting char character = Serial.read() will "typecast" the output as a char.
     char character = 'a';
@@ -290,6 +291,7 @@ void loop() {
     while (character != 'S')  {                                   
       character = Serial1.read();       
     }
+    // Serial.println("Starting char 'S' found! "); // testing
 
     // Records the time of when the 'S' is read
     timeOfNewData = now();
@@ -299,16 +301,22 @@ void loop() {
 
     // Reads from Serial1, byte by byte, and adds the char that was read
     // until the terminating char '@' is read. 
+    // Serial.print("Entering loop to read Serial1..."); // testing
     while (character != '@') {                      // ASCII code for '@' = 64
       while(Serial1.available()) {      
         character = Serial1.read();
         data.concat(String(character));
+        if (character == '@') {
+          break;
+        }
       }
     }
+    // Serial.println("exited loop."); // testing
 
     Serial.print("Data: ");
     Serial.println(data);
 
+    // Serial.println("Beginning publishing data."); // testing
     // Returns 1 or 3 if Ethernet connection is not maintained. 
     // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
     byte ethReturnByte = Ethernet.maintain(); 
@@ -339,6 +347,8 @@ void loop() {
       unpublishedToSD(data, timeOfNewData);
     }
   }
+
+  // Serial.println("Begining processing unpublished data."); // testing
   // This section attempts to publish data that was not published but stored in the SD/
   // It does this until it has been 30 seconds since the last data request to arduino.
   File unpublishedFolder = SD.open("unpublished/");
@@ -354,16 +364,19 @@ void loop() {
         }
       }
     }
-    delay(2000); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
+    delay(1000); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
   }
   unpublishedFolder.close();
+  // Serial.println("END OF MAIN LOOP"); // testing
 }
 
 // Clears the Serial1 buffer. 
 void clearSerial1Buffer() {
+  // Serial.print("Clearing serial buffer..."); // testing
   while (Serial1.available()) {
     Serial1.read();
   }
+  // Serial.println("cleared."); // testing
 }
 
 // NTP Functions. Copied straight out of /Examples/Time/TimeNTP.ino
