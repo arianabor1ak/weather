@@ -6,7 +6,7 @@ String one_data;                     // this is the top sections multiplexer dat
 String two_data;                     // this is the sway sensor data, approx. 80 fields
 String three_data;                   // this is the flux sensor data, approx. 62 fields
 String four_data;                    // this is the traixial magnetometer data, approx. 83 fields
-String five_data;                    // this is a placemarker for future data from the top. Or from the bottom or something new. 
+String kz_data;                      // this is the top section aux power supply data
 String stringToSend = "";                 // this is the concantenated string of the above sub-strings of data that comprises the tower data.
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -33,9 +33,9 @@ void setup()
 
   four_data = getData("44");              // read the top section triaxial magnetometer sensor data
     
-  five_data = getData("55");
+  kz_data = getData("KZ");              // read the top section aux power supply data
 
-  stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "5-\t" + five_data + "@";
+  stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ void loop()
       clearSerial1Buffer();                     // teensy and then update the Arduino strings.
   }
     
-    if (teensy_data == "GD")                        // the teensy tells the arduino to Gather the Data.  The teensy then waits for the Arduino to send the data   
+    if (teensy_data == "GD")                       // the teensy tells the arduino to Gather the Data.  The teensy then waits for the Arduino to send the data   
     {                                         // the teensy reads the string of data.  Once it has it the Arduino collects the updated data.
 
       int stringLength = stringToSend.length();
@@ -90,10 +90,10 @@ void loop()
 
       four_data = getData("44");              // read the top section triaxial magnetometer sensor data
     
-      five_data = getData("55");              // read the top section future data, acts as a placeholder for future data
+      kz_data = getData("KZ");              // read the top section aux power supply data
 
       //concatenate the string before the Teensy requests more data
-      stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "5-\t" + five_data + "@";
+      stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
     }
 }
 
