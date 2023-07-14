@@ -17,7 +17,7 @@ String stringToSend = "";                 // this is the concantenated string of
 
 void setup()
 {
-  Serial.begin(9600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
+  Serial.begin(57600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
   Serial1.begin(57600);                   // this is the baud rate that the Arduino sends the concantenated string of data to the teensy
                                           //
   Serial.print("QQ");                     // send a QQ to start the data collection
