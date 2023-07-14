@@ -19,7 +19,7 @@ String stringToSend = "";                 // this is the concantenated string of
 
 void setup()
 {
-  Serial.begin(57600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
+  Serial.begin(9600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
   Serial1.begin(57600);                   // this is the baud rate that the Arduino sends the concantenated string of data to the teensy
                                           //
   Serial.print("QQ");                     // send a QQ to start the data collection
@@ -35,7 +35,11 @@ void setup()
 
   four_data = getData("44", 5000);              // read the top section triaxial magnetometer sensor data
     
+  Serial.flush();
+  Serial.begin(38400);
   kz_data = getData("KZ", 5000);              // read the top section aux power supply data
+  Serial.flush();
+  Serial.begin(9600);
 
   stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
 }
@@ -92,7 +96,11 @@ void loop()
 
       four_data = getData("44", 5000);              // read the top section triaxial magnetometer sensor data
     
+      Serial.flush();
+      Serial.begin(38400);
       kz_data = getData("KZ", 5000);              // read the top section aux power supply data
+      Serial.flush();
+      Serial.begin(9600);
 
       //concatenate the string before the Teensy requests more data
       stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
