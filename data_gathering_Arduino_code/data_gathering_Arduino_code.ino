@@ -1,3 +1,5 @@
+#include <TimeLib.h>
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------
 String data;
 String teensy_data;
@@ -23,17 +25,17 @@ void setup()
   Serial.print("QQ");                     // send a QQ to start the data collection
   // delay(13000);                           // wait up to 13 seconds for the data to be collected
 
-  b_data = getData("SS");                 // read the bottom section data including 30 volt supply
+  b_data = getData("SS", 10000);                 // read the bottom section data including 30 volt supply
     
-  one_data = getData("11");               // read the top section mux data
+  one_data = getData("11", 5000);               // read the top section mux data
     
-  two_data = getData("22");               // read the top section sway sensor data
+  two_data = getData("22", 5000);               // read the top section sway sensor data
     
-  three_data = getData("33");             // read the top section flux data
+  three_data = getData("33", 5000);             // read the top section flux data
 
-  four_data = getData("44");              // read the top section triaxial magnetometer sensor data
+  four_data = getData("44", 5000);              // read the top section triaxial magnetometer sensor data
     
-  kz_data = getData("KZ");              // read the top section aux power supply data
+  kz_data = getData("KZ", 5000);              // read the top section aux power supply data
 
   stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
 }
@@ -80,17 +82,17 @@ void loop()
       // delay(13000);                          // wait up to 13 seconds for the data to be collected
       //not sure if the delay is necessary since it's not affecting anything yet
    
-      b_data = getData("SS");                 // read the bottom section data including 30 volt supply
+      b_data = getData("SS", 10000);                 // read the bottom section data including 30 volt supply
     
-      one_data = getData("11");               // read the top section mux data
+      one_data = getData("11", 5000);               // read the top section mux data
     
-      two_data = getData("22");               // read the top section sway sensor data
+      two_data = getData("22", 5000);               // read the top section sway sensor data
     
-      three_data = getData("33");             // read the top section flux data
+      three_data = getData("33", 5000);             // read the top section flux data
 
-      four_data = getData("44");              // read the top section triaxial magnetometer sensor data
+      four_data = getData("44", 5000);              // read the top section triaxial magnetometer sensor data
     
-      kz_data = getData("KZ");              // read the top section aux power supply data
+      kz_data = getData("KZ", 5000);              // read the top section aux power supply data
 
       //concatenate the string before the Teensy requests more data
       stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
@@ -110,13 +112,14 @@ void loop()
  * the letters that will return data 
  * are 'P', 'T', 'B', and '1' -> that is a one
  */
-String getData(String letters){
-  unsigned long current_time = millis();
+String getData(String letters, unsigned long delayMillis){
+  Serial.print(letters);
+  unsigned long timeOfCall = millis();
+
   String data = "";
   char byte = 'a';
-  Serial.print(letters);
 
-  while (byte != '\r') {  //read all the data until a carriage return
+  while (byte != '\r' && (millis() < (timeOfCall) + delayMillis)) {  //read all the data until a carriage return
     while (Serial.available()) {
       byte = Serial.read();
       if (byte == '\r')   //don't add byte to the data if it is a carriage return
