@@ -75,7 +75,7 @@ class Weather_DB:
 		try:
 			command = """
 			UPDATE formatted_data
-			SET %s = %s
+			SET "%s" = %s
 			WHERE id = %s
 			"""
 			self.cursor.execute(command, (AsIs(column_name), value, row_id,))
@@ -92,7 +92,7 @@ class Weather_DB:
 			command = """
 			UPDATE raw_data
 			SET formatted_id = %s
-			WHERE raw_data.id = %s;
+			WHERE id = %s;
 			"""
 			self.cursor.execute(command, (formatted_id, raw_id,))
 			self.db_commit()
