@@ -49,7 +49,7 @@ CREATE TABLE formatted_data (
 	"fan_voltage" DOUBLE PRECISION,
 	"fan_current" DOUBLE PRECISION,
 	"fan_speed" DOUBLE PRECISION,
-	"TS4200_current" DOUBLE PRECISION,
+	"Arduino_teensy_current" DOUBLE PRECISION,
 	"RF_link_current" DOUBLE PRECISION,
 	"box_humidity" DOUBLE PRECISION,
 	"ground_temperature" DOUBLE PRECISION, --
