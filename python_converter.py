@@ -40,7 +40,7 @@ def conversion(field, raw_data_array, column_id, columns, row_id, in_range_id):
         else:
             for j in range(3):
                 weather_db.insert_formatted_data(columns[column_id], converted_data, row_id)
-                weather_db.insert_in_range(columns[column_id], in_range_data, in_range_id)
+                weather_db.insert_formatted_data(str(columns[column_id]) + "_range", in_range_data, in_range_id)
                 column_id += 1
         return field, column_id
         
@@ -78,7 +78,7 @@ def conversion(field, raw_data_array, column_id, columns, row_id, in_range_id):
     except ValueError as err:
         print("ValueError: ", err)
     weather_db.insert_formatted_data(columns[column_id], converted_data, row_id) #insert the converted value into the database
-    weather_db.insert_in_range(columns[column_id], in_range_data, in_range_id)
+    weather_db.insert_formatted_data(str(columns[column_id]) + "_range", in_range_data, in_range_id)
         
     field += 1
     column_id += 1
