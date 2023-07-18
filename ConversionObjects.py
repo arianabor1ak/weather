@@ -30,6 +30,18 @@ class ConversionObject:
 		converted = float(rawdata)
 		return converted
 	
+	def check_range(self, converted_data):
+		if self.typical_lower_limit and self.typical_upper_limit:
+			if converted_data >= self.typical_lower_limit:
+				if converted_data <= self.typical_upper_limit:
+					return 2
+				else:
+					return 3
+			else:
+				return 1
+		else:
+			return 0
+	
 class unix_time(ConversionObject):
 	def __init__(self):
 		data_name = "unix_time"
@@ -228,12 +240,12 @@ class rain_drip_code(ConversionObject):
 	def __init__(self):
 		data_name = "rain_drip_code"
 		data_type = "dec"
-		data_typical_lower_limit = 0
-		data_typical_upper_limit = 0
-		integer_count = 0
-		decimal_count = 0
-		sensor_lower_limit = 0
-		sensor_upper_limit = 0
+		data_typical_lower_limit = None
+		data_typical_upper_limit = None
+		integer_count = None
+		decimal_count = None
+		sensor_lower_limit = None
+		sensor_upper_limit = None
 		ConversionObject.__init__(self, data_name, data_type, data_typical_lower_limit, data_typical_upper_limit, integer_count, decimal_count, sensor_lower_limit, sensor_upper_limit)
 		
 	def format(self, rawdata):
@@ -525,7 +537,7 @@ class IR_snow_depth(ConversionObject):
 		decimal_count = 2
 		sensor_lower_limit = 0
 		sensor_upper_limit = 30
-		self.height_of_sensor = 304.8 #using 10 feet converted to cm, might not be right
+		self.height_of_sensor = 17.323 #in cm
 		ConversionObject.__init__(self, data_name, data_type, data_typical_lower_limit, data_typical_upper_limit, integer_count, decimal_count, sensor_lower_limit, sensor_upper_limit)
 
 	def format(self, rawdata):
@@ -690,11 +702,11 @@ class fan_speed(ConversionObject):
 		return converted
 
 #-------------------------------------------------------------------------------------------------------------------
-#													TS4200_CURRENT:
+#													ARDUINO_TEENSY_CURRENT:
 # Result is in mA.
-class TS4200_current(ConversionObject):
+class Arduino_teensy_current(ConversionObject):
 	def __init__(self):
-		data_name = "TS4200_current"
+		data_name = "Arduino_teensy_current"
 		data_type = "dec"
 		data_typical_lower_limit = 100
 		data_typical_upper_limit = 140
@@ -785,7 +797,7 @@ class snow_depth_sonic(ConversionObject):
 		decimal_count = 2
 		sensor_lower_limit = 75
 		sensor_upper_limit = None
-		self.height_of_sensor = 120 #10 feet converted to inches, might not be right
+		self.height_of_sensor = 113 #in inches
 		ConversionObject.__init__(self, data_name, data_type, data_typical_lower_limit, data_typical_upper_limit, integer_count, decimal_count, sensor_lower_limit, sensor_upper_limit) 
 
 	def format(self, rawdata):
@@ -1629,8 +1641,8 @@ class power_status(ConversionObject):
 	def __init__(self):
 		data_name = "power_status"
 		data_type = "dec"
-		data_typical_lower_limit = 00
-		data_typical_upper_limit = 11
+		data_typical_lower_limit = "00"
+		data_typical_upper_limit = "11"
 		integer_count = None
 		decimal_count = None
 		sensor_lower_limit = None
@@ -1665,8 +1677,8 @@ class power_fault_status(ConversionObject):
 	def __init__(self):
 		data_name = "power_fault_status"
 		data_type = "dec"
-		data_typical_lower_limit = 0000
-		data_typical_upper_limit = 1111
+		data_typical_lower_limit = "0000"
+		data_typical_upper_limit = "1111"
 		integer_count = None
 		decimal_count = None
 		sensor_lower_limit = None
@@ -1715,16 +1727,20 @@ class soil_moist(ConversionObject):
 
 	def format(self, rawdata):
 		value = float(rawdata) / 1000
-		if value >= 0 and value < 1.1:
-			converted = 10 * value - 1
-		elif value >= 1.1 and value < 1.3:
-			converted = 25 * value - 17.5
-		elif value >= 1.3 and value < 1.82:
-			converted = 48.08 * value - 47.5
-		elif value >= 1.82 and value <= 2.2:
-			converted = 26.32 * value - 7.89
-		else:
+		try:
+			assert (value >= 0 and value <= 2.2), "Soil moist value out of index"
+		except AssertionError as err:
+			print(err)
 			converted = value
+		else:
+			if value >= 0 and value < 1.1:
+				converted = 10 * value - 1
+			elif value >= 1.1 and value < 1.3:
+				converted = 25 * value - 17.5
+			elif value >= 1.3 and value < 1.82:
+				converted = 48.08 * value - 47.5
+			elif value >= 1.82 and value <= 2.2:
+				converted = 26.32 * value - 7.89
 		return converted
 	
 #-------------------------------------------------------------------------------------------------------------------
@@ -1795,7 +1811,7 @@ class soil_electronics_Vref(ConversionObject):
 	def __init__(self):
 		data_name = "soil_electronics_Vref"
 		data_type = "dec"
-		data_typical_lower_limit = None
+		data_typical_lower_limit = 4.096
 		data_typical_upper_limit = 4.096
 		integer_count = 1
 		decimal_count = 3
@@ -3134,27 +3150,24 @@ class lightning_3001_lux(ConversionObject):
 	def format(self, rawdata):
 		converted = str(bin(int(rawdata))) #convert the data into a binary string
 		converted = converted[2:] #take off the '0b' at the start of the string
-		print("Converted: ", converted, type(converted))
 		upper_bits = ""
 		lower_bits = ""
 		
 		converted_length = len(converted)
-		print("Length: ", converted_length)
-		if converted_length == 15:
-			print("I'm 15")
-			upper_bits = converted[:3]
-			lower_bits = converted[3:]
-		elif converted_length == 16:
-			print("I'm 16")
-			upper_bits = converted[:4]
-			lower_bits = converted[4:]
+		try:
+			assert (converted_length == 15 or converted_length == 16), "Lightning 3001 lux value does not have correct number of bits"
+		except AssertionError as err:
+			print(err)
+			return 0
 		else:
-			#throw an exception
-			upper_bits = "0000"
-			lower_bits = "0000"
-		print("Upper bits: ", upper_bits, type(upper_bits), " and lower bits: ", lower_bits, type(lower_bits))
-		lux = .01 * (2 ** int(upper_bits, 2)) * int(lower_bits, 2)
-		return lux
+			if converted_length == 15:
+				upper_bits = converted[:3]
+				lower_bits = converted[3:]
+			else:
+				upper_bits = converted[:4]
+				lower_bits = converted[4:]
+			lux = .01 * (2 ** int(upper_bits, 2)) * int(lower_bits, 2)
+			return lux
 	
 #-------------------------------------------------------------------------------------------------------------------
 #												LIGHTNING_SKYSCAN_CURRENT:

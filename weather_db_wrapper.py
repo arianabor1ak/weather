@@ -24,7 +24,6 @@ class Weather_DB:
 		)
 		self.cursor = self.connection.cursor()
 		print("Database connection: ", self.connection.closed)
-		# return self.connection #do we need to return anything?
 	
 	def db_commit(self):
 		#logging info
@@ -69,6 +68,24 @@ class Weather_DB:
 			print(f"Error: '{err}'")
 		self.db_close()
 
+	# Creates a new row and inserts the formatted_id into formatted_in_range
+	def insert_first_range(self, formatted):
+		self.db_connect()
+		try:
+			command = """
+			INSERT INTO formatted_in_range (formatted_id)
+			VALUES (%s)
+			RETURNING id
+			"""
+			self.cursor.execute(command, (formatted,))
+			formatted_in_range_id = self.cursor.fetchone()
+			self.db_commit()
+			self.db_close()
+			return formatted_in_range_id
+		except Exception as err:
+			print(f"Error: '{err}'")
+		self.db_close()
+
 	# Inserts converted data into formatted_data
 	def insert_formatted_data(self, column_name, value, row_id):
 		self.db_connect()
@@ -82,8 +99,22 @@ class Weather_DB:
 			self.db_commit()
 		except Exception as err:
 			print(f"Error: '{err}'")
-		finally:
-			self.db_close()
+		self.db_close()
+
+	# Inserts range data into formatted_in_range for every column in formatted_data
+	def insert_in_range(self, column_name, value, row_id):
+		self.db_connect()
+		try:
+			command = """
+			UPDATE formatted_in_range
+			SET "%s" = %s
+			WHERE id = %s
+			"""
+			self.cursor.execute(command, (AsIs(column_name), value, row_id,))
+			self.db_commit()
+		except Exception as err:
+			print(f"Error: '{err}'")
+		self.db_close()
 
 	# Inserts the formatted_id into the corresponding raw_data row
 	def insert_formatted_id(self, raw_id, formatted_id):
@@ -98,8 +129,7 @@ class Weather_DB:
 			self.db_commit()
 		except Exception as err:
 			print(f"Error: '{err}'")
-		finally:
-			self.db_close()
+		self.db_close()
 
 	"""
 	------------------------------------------DATABASE RETRIEVAL------------------------------------------
