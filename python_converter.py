@@ -21,7 +21,7 @@ def make_column_dict():
 # Creates a subclass based on the column_id
 # Performs the conversion according the subclass
 # Inserts the converted data into the formatted data table
-def conversion(field, raw_data_array, column_id, columns, row_id, in_range_id):
+def conversion(field, raw_data_array, column_id, columns, row_id):
     find_field = columns[column_id] #use column_id to index which subclass object to create
     
     if "upper" in find_field: #special case where three raw data fields will be concatenated
@@ -39,8 +39,7 @@ def conversion(field, raw_data_array, column_id, columns, row_id, in_range_id):
             print("ValueError: ", err)
         else:
             for j in range(3):
-                weather_db.insert_formatted_data(columns[column_id], converted_data, row_id)
-                weather_db.insert_formatted_data(str(columns[column_id]) + "_range", in_range_data, in_range_id)
+                weather_db.insert_formatted_data(columns[column_id], converted_data, in_range_data, row_id)
                 column_id += 1
         return field, column_id
         
@@ -77,8 +76,7 @@ def conversion(field, raw_data_array, column_id, columns, row_id, in_range_id):
         in_range_data = converted.check_range(converted_data)
     except ValueError as err:
         print("ValueError: ", err)
-    weather_db.insert_formatted_data(columns[column_id], converted_data, row_id) #insert the converted value into the database
-    weather_db.insert_formatted_data(str(columns[column_id]) + "_range", in_range_data, in_range_id)
+    weather_db.insert_formatted_data(columns[column_id], converted_data, in_range_data, row_id) #insert the converted value into the database
         
     field += 1
     column_id += 1
@@ -92,7 +90,6 @@ def parse_data(raw_data_array, raw_id, columns):
     column_id = 2 #id of sql column data should be inserted into
     length = len(raw_data_array)
     row_id = 0
-    in_range_id = 0
 
     try:
         assert (raw_data_array[-1] == "@"), "Master string must end with \'@\'"
@@ -109,7 +106,6 @@ def parse_data(raw_data_array, raw_id, columns):
         if field == 0: #Unix timestamp
             row_id = weather_db.insert_first(raw_data_array[0]) #column_id is 1
             weather_db.insert_formatted_id(raw_id, row_id)
-            in_range_id = weather_db.insert_first_range(row_id)
             converted = ConversionObjects.unix_time()
             converted_time = converted.format(raw_data_array[0]) #extrapolate into specified fields
             
@@ -117,7 +113,7 @@ def parse_data(raw_data_array, raw_id, columns):
             stardate = ""
             for time in converted_time:
                 column_name = columns[column_id]
-                weather_db.insert_formatted_data(column_name, time, row_id) #insert each field into own column
+                weather_db.insert_time_data(column_name, time, row_id) #insert each field into own column
                 column_id += 1
 
                 if star_id == 5:
@@ -125,7 +121,7 @@ def parse_data(raw_data_array, raw_id, columns):
                 if star_id < 6:
                     stardate += time
                 star_id += 1
-            weather_db.insert_formatted_data('stardate', stardate, row_id)
+            weather_db.insert_time_data('stardate', stardate, row_id)
             column_id += 2 #increment an extra space to account for the future_time column
             field += 1
         elif raw_data_array[field] == "S-":
@@ -156,7 +152,7 @@ def parse_data(raw_data_array, raw_id, columns):
             # assert ()
             field += 1
         else: 
-            field, column_id = conversion(field, raw_data_array, column_id, columns, row_id, in_range_id)
+            field, column_id = conversion(field, raw_data_array, column_id, columns, row_id)
 
 def main():
     columns = make_column_dict()
