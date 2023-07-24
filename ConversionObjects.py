@@ -2,6 +2,8 @@ from unicodedata import decimal
 import datetime
 import re
 from math import log
+import sys
+import logging
 
 class ConversionObject:
 
@@ -1730,7 +1732,7 @@ class soil_moist(ConversionObject):
 		try:
 			assert (value >= 0 and value <= 2.2), "Soil moist value out of index"
 		except AssertionError as err:
-			print(err)
+			logging.error(f"{err}")
 			converted = value
 		else:
 			if value >= 0 and value < 1.1:
@@ -3157,7 +3159,7 @@ class lightning_3001_lux(ConversionObject):
 		try:
 			assert (converted_length == 15 or converted_length == 16), "Lightning 3001 lux value does not have correct number of bits"
 		except AssertionError as err:
-			print(err)
+			logging.error(f"{err}")
 			return 0
 		else:
 			if converted_length == 15:
@@ -5495,8 +5497,10 @@ class Aux_box_over_current_status(ConversionObject):
 
 
 def main():
+	logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
+
 	geiger1 = ConversionObject()
-	print()
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
     main()

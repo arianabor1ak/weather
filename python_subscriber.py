@@ -1,19 +1,18 @@
 import paho.mqtt.client as mqtt
 import weather_db_wrapper
+import sys
+import logging
 
-# Create global instance of database access class
 weather_db = weather_db_wrapper.Weather_DB()
 
 # The callback for when the client receives a CONNACK response from the server.
-# Subscribing in on_connect() means that if we lose the connection and
-# reconnect then subscriptions will be renewed.
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code: " + str(rc)) # turn this into a logging statement
+    logging.debug(f"Connected with result code: {str(rc)}")
+    # Subscribing in on_connect() means that if we lose the connection and reconnect then subscriptions will be renewed.
     client.subscribe("CarletonWeatherTower")
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    global current_master_string
     current_master_string = msg.payload.decode("utf-8")
     weather_db.insert_master_string(current_master_string)
 
@@ -28,7 +27,6 @@ def main():
     client.on_message = on_message
 
     # Connecting to broker
-	# Need to change once we have our own broker
     client.connect("test.mosquitto.org", 1883, 60)
 
     # Blocking call that processes network traffic, dispatches callbacks and
@@ -36,4 +34,5 @@ def main():
     client.loop_forever()
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
     main()
