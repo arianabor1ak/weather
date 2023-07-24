@@ -183,10 +183,10 @@ class Weather_DB:
 			self.db_close()
 
 def main():
+	logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
 
 	weather_db = Weather_DB()
 	weather_db.find_null()
 
 if __name__ == "__main__":
-	logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
 	main()

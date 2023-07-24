@@ -2,6 +2,7 @@ import ConversionObjects
 import weather_db_wrapper
 import sys
 import logging
+from time import time
 
 weather_db = weather_db_wrapper.Weather_DB()
 delimiter_dict = {
@@ -11,7 +12,7 @@ delimiter_dict = {
     "3-": (363, "3"),
     "4-": (427, "4"),
     "Z-": (512, "aux")
-    }
+    } #index where the delimiter should be and the value that comes after the delimiter
 
 # Splits the raw_master_string into an array using tabs as delimiters 
 # since the raw master string is tab separated
@@ -167,20 +168,24 @@ def parse_data(raw_data_array, raw_id, columns):
     weather_db.insert_flags(row_flag, one_flag, two_flag, three_flag, four_flag, kz_flag, row_id)
 
 def main():
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
+
     columns = make_column_dict()
 
-    #loop forever:
-    raw_rows = weather_db.find_null()
-    if raw_rows:
-        for row in raw_rows:
-            current_row = weather_db.get_master_string(row)
-            string_list = create_raw_data_array(current_row)
-            logging.debug(f"Row: {row}")
-            logging.debug(f"Row string: {string_list}")
-            row = row[0]
-            parse_data(string_list, row, columns)
-    weather_db.db_close()
+    start = time() - 6
+    while True:
+        if time() - start >= 5:
+            start = time()
+            raw_rows = weather_db.find_null()
+            if raw_rows:
+                for row in raw_rows:
+                    current_row = weather_db.get_master_string(row)
+                    string_list = create_raw_data_array(current_row)
+                    logging.debug(f"Row: {row}")
+                    logging.debug(f"Row string: {string_list}")
+                    row = row[0]
+                    parse_data(string_list, row, columns)
+            weather_db.db_close()
 
 if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
     main()

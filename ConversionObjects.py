@@ -5502,5 +5502,4 @@ def main():
 	geiger1 = ConversionObject()
 
 if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
     main()
