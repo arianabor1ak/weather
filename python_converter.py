@@ -6,12 +6,12 @@ from time import time
 
 weather_db = weather_db_wrapper.Weather_DB()
 delimiter_dict = {
-    "S-": (1, "B"),
-    "1-": (164, "1"),
-    "2-": (281, "2"),
-    "3-": (363, "3"),
-    "4-": (427, "4"),
-    "Z-": (512, "aux")
+    "S-": (1, "B", "row_flag"),
+    "1-": (164, "1", "s_flag"),
+    "2-": (281, "2", "one_flag"),
+    "3-": (363, "3", "two_flag"),
+    "4-": (427, "4", "three_flag"),
+    "Z-": (512, "aux", "four_flag")
     } #index where the delimiter should be and the value that comes after the delimiter
 
 # Splits the raw_master_string into an array using tabs as delimiters 
@@ -138,7 +138,6 @@ def parse_data(raw_data_array, raw_id, columns):
             column_id += 2 #increment an extra space to account for the future_time column
             field += 1
         elif raw_data_array[field] in delimiter_dict:
-            logging.debug("I'm a delimiter in the dictionary, yeeeeoooouuuch!!!")
             logging.debug(f"{raw_data_array[field]} index: {field}")
             delimiter_tuple = delimiter_dict[raw_data_array[field]]
             try:
@@ -146,6 +145,8 @@ def parse_data(raw_data_array, raw_id, columns):
                 assert (raw_data_array[field + 1] == delimiter_tuple[1]), f"Wrong data after {raw_data_array[field]}" #should be used after getting data from tower
             except AssertionError as err:
                 logging.error(f"{err}")
+                executed = str(delimiter_tuple[2]) + " = 0" #if delimiter is at wrong index, section before the current one was messed up
+                exec(executed)
             logging.debug(f"Here's the data after {raw_data_array[field]}: {raw_data_array[field + 1]}")
             field = delimiter_tuple[0] + 2
         else: 
