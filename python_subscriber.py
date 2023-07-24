@@ -17,6 +17,8 @@ def on_message(client, userdata, msg):
     weather_db.insert_master_string(current_master_string)
 
 def main():
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
+    
     # Creating the client object with an approporiate id
     client = mqtt.Client(client_id="Python Handler")
 
@@ -34,5 +36,4 @@ def main():
     client.loop_forever()
 
 if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
     main()
