@@ -1,7 +1,17 @@
 import ConversionObjects
 import weather_db_wrapper
+import sys
+import logging
 
 weather_db = weather_db_wrapper.Weather_DB()
+delimiter_dict = {
+    "S-": (1, "B"),
+    "1-": (164, "1"),
+    "2-": (281, "2"),
+    "3-": (363, "3"),
+    "4-": (427, "4"),
+    "Z-": (512, "aux")
+    }
 
 # Splits the raw_master_string into an array using tabs as delimiters 
 # since the raw master string is tab separated
@@ -15,7 +25,7 @@ def make_column_dict():
     column_ids = weather_db.get_column_ids()
     for row in column_ids:
         column_dict[int(row[1])] = row[0]
-    print("Columns: ", column_dict)
+    logging.debug(f"Columns: {column_dict}")
     return column_dict
 
 # Creates a subclass based on the column_id
@@ -36,7 +46,7 @@ def conversion(field, raw_data_array, column_id, columns, row_id):
             converted_data = converted.format(data_to_convert)
             in_range_data = converted.check_range(converted_data)
         except ValueError as err:
-            print("ValueError: ", err)
+            logging.error(f"ValueError: {err}")
         else:
             for j in range(3):
                 weather_db.insert_formatted_data(columns[column_id], converted_data, in_range_data, row_id)
@@ -75,7 +85,7 @@ def conversion(field, raw_data_array, column_id, columns, row_id):
         converted_data = converted.format(raw_data_array[field]) #perform the conversion
         in_range_data = converted.check_range(converted_data)
     except ValueError as err:
-        print("ValueError: ", err)
+        logging.error(f"ValueError: {err}")
     weather_db.insert_formatted_data(columns[column_id], converted_data, in_range_data, row_id) #insert the converted value into the database
         
     field += 1
@@ -88,21 +98,23 @@ def conversion(field, raw_data_array, column_id, columns, row_id):
 def parse_data(raw_data_array, raw_id, columns):
     field = 0
     column_id = 2 #id of sql column data should be inserted into
-    length = len(raw_data_array)
     row_id = 0
+
+    row_flag = s_flag = one_flag = two_flag = three_flag = four_flag = kz_flag = 1
 
     try:
         assert (raw_data_array[-1] == "@"), "Master string must end with \'@\'"
     except IndexError as err:
-        print(err)
-        print("Master string cannot be empty")
+        logging.error(f"Master string cannot be empty\n{err}")
+        row_id = weather_db.insert_first(0)
+        weather_db.insert_formatted_id(raw_id, row_id)
         return
     except AssertionError as error:
-        print(error)
-        weather_db.insert_first(raw_data_array[0])
-        return #does this have to return? could still try to parse string based on length
+        logging.error(f"{error}")
+        row_flag = 2
 
-    while raw_data_array[field] != "@" and field < length:
+    length = len(raw_data_array)
+    while field < length and raw_data_array[field] != "@":
         if field == 0: #Unix timestamp
             row_id = weather_db.insert_first(raw_data_array[0]) #column_id is 1
             weather_db.insert_formatted_id(raw_id, row_id)
@@ -113,7 +125,7 @@ def parse_data(raw_data_array, raw_id, columns):
             stardate = ""
             for time in converted_time:
                 column_name = columns[column_id]
-                weather_db.insert_time_data(column_name, time, row_id) #insert each field into own column
+                weather_db.insert_data(column_name, time, row_id) #insert each field into own column
                 column_id += 1
 
                 if star_id == 5:
@@ -121,51 +133,54 @@ def parse_data(raw_data_array, raw_id, columns):
                 if star_id < 6:
                     stardate += time
                 star_id += 1
-            weather_db.insert_time_data('stardate', stardate, row_id)
+            weather_db.insert_data('stardate', stardate, row_id)
             column_id += 2 #increment an extra space to account for the future_time column
             field += 1
-        elif raw_data_array[field] == "S-":
-            print("S- index: ", field)
+        elif raw_data_array[field] in delimiter_dict:
+            logging.debug("I'm a delimiter in the dictionary, yeeeeoooouuuch!!!")
+            logging.debug(f"{raw_data_array[field]} index: {field}")
+            delimiter_tuple = delimiter_dict[raw_data_array[field]]
             try:
-                assert (field == 1), "S- is at the wrong index"
+                assert (field == delimiter_tuple[0]), f"{raw_data_array[field]} is at the wrong index"
+                assert (raw_data_array[field + 1] == delimiter_tuple[1]), f"Wrong data after {raw_data_array[field]}" #should be used after getting data from tower
             except AssertionError as err:
-                print(err)
-            field = 2
-        elif raw_data_array[field] == "1-":
-            print("1- index: ", field)
-            # assert ()
-            field += 1 #update field to correct field once it's known
-        elif raw_data_array[field] == "2-":
-            print("2- index: ", field)
-            # assert ()
-            field += 1
-        elif raw_data_array[field] == "3-":
-            print("3- index: ", field)
-            # assert ()
-            field += 1
-        elif raw_data_array[field] == "4-":
-            print("4- index: ", field)
-            # assert ()
-            field += 1
-        elif raw_data_array[field] == "Z-":
-            print("Z- index: ", field)
-            # assert ()
-            field += 1
+                logging.error(f"{err}")
+            logging.debug(f"Here's the data after {raw_data_array[field]}: {raw_data_array[field + 1]}")
+            field = delimiter_tuple[0] + 2
         else: 
+            try:
+                assert (field != 1 and field != 164 and field != 281 and field != 363 and field != 427 and field != 512), "This index should be a section separator"
+            except AssertionError as err:
+                logging.error(f"{err}")
             field, column_id = conversion(field, raw_data_array, column_id, columns, row_id)
+    try:
+        assert (field == 554), "String ends with wrong index"
+    except AssertionError as err:
+        logging.error(f"{err}")
+        kz_flag = 0
+    if s_flag == 0 and one_flag == 0 and two_flag == 0 and three_flag == 0 and four_flag == 0 and kz_flag == 0:
+        row_flag = 0 #entire row is bad
+    elif s_flag == 0 or one_flag == 0 or two_flag == 0 or three_flag == 0 or four_flag == 0 or kz_flag == 0 or row_flag == 2:
+        row_flag = 2 #partially bad
+    else:
+        row_flag = 1
+    weather_db.insert_flags(row_flag, one_flag, two_flag, three_flag, four_flag, kz_flag, row_id)
 
 def main():
     columns = make_column_dict()
 
+    #loop forever:
     raw_rows = weather_db.find_null()
     if raw_rows:
         for row in raw_rows:
             current_row = weather_db.get_master_string(row)
             string_list = create_raw_data_array(current_row)
-            print("Row string: ", string_list)
-            print("Row: ", row)
+            logging.debug(f"Row: {row}")
+            logging.debug(f"Row string: {string_list}")
             row = row[0]
             parse_data(string_list, row, columns)
+    weather_db.db_close()
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
     main()
