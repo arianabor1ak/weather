@@ -2,6 +2,7 @@ import ConversionObjects
 import weather_db_wrapper
 import sys
 import logging
+import traceback
 from time import time
 
 weather_db = weather_db_wrapper.Weather_DB()
@@ -14,8 +15,8 @@ delimiter_dict = {
     "Z-": (512, "aux", "four_flag")
     } #index where the delimiter should be and the value that comes after the delimiter
 
-# Splits the raw_master_string into an array using tabs as delimiters 
-# since the raw master string is tab separated
+# Splits the raw_string into an array using tabs as delimiters 
+# since the raw string is tab separated
 def create_raw_data_array(raw_data_string):
     raw_data_array = raw_data_string.split('\t')
     return raw_data_array
@@ -26,7 +27,6 @@ def make_column_dict():
     column_ids = weather_db.get_column_ids()
     for row in column_ids:
         column_dict[int(row[1])] = row[0]
-    logging.debug(f"Columns: {column_dict}")
     return column_dict
 
 # Creates a subclass based on the column_id
@@ -87,6 +87,8 @@ def conversion(field, raw_data_array, column_id, columns, row_id):
         in_range_data = converted.check_range(converted_data)
     except ValueError as err:
         logging.error(f"ValueError: {err}")
+    except Exception as err: #catch more specific errors if they come up
+        logging.error(f"{err}")
     weather_db.insert_formatted_data(columns[column_id], converted_data, in_range_data, row_id) #insert the converted value into the database
         
     field += 1
@@ -104,9 +106,9 @@ def parse_data(raw_data_array, raw_id, columns):
     row_flag = s_flag = one_flag = two_flag = three_flag = four_flag = kz_flag = 1
 
     try:
-        assert (raw_data_array[-1] == "@"), "Master string must end with \'@\'"
+        assert (raw_data_array[-1] == "@"), "Raw string must end with \'@\'"
     except IndexError as err:
-        logging.error(f"Master string cannot be empty\n{err}")
+        logging.error(f"Raw string cannot be empty\n{err}")
         row_id = weather_db.insert_first(0)
         weather_db.insert_formatted_id(raw_id, row_id)
         return
@@ -117,8 +119,12 @@ def parse_data(raw_data_array, raw_id, columns):
     length = len(raw_data_array)
     while field < length and raw_data_array[field] != "@":
         if field == 0: #Unix timestamp
-            row_id = weather_db.insert_first(raw_data_array[0]) #column_id is 1
-            weather_db.insert_formatted_id(raw_id, row_id)
+            try:
+                row_id = weather_db.insert_first(raw_data_array[0]) #column_id is 1
+                weather_db.insert_formatted_id(raw_id, row_id)
+            except Exception as err:
+                logging.error(f"{err}")
+                return #have to return because can't parse data if these fail
             converted = ConversionObjects.unix_time()
             converted_time = converted.format(raw_data_array[0]) #extrapolate into specified fields
             
@@ -169,24 +175,35 @@ def parse_data(raw_data_array, raw_id, columns):
     weather_db.insert_flags(row_flag, one_flag, two_flag, three_flag, four_flag, kz_flag, row_id)
 
 def main():
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
-
-    columns = make_column_dict()
-
+    columns = []
+    while not columns: #makes sure the program keeps looping until columns is populated
+        try:
+            logging.basicConfig(stream=sys.stderr, level=logging.DEBUG, format="{levelname}:({filename}:{lineno}) {message}", style="{")
+            logging.debug(f"I'm making a column")
+            columns = make_column_dict()
+        except Exception as err:
+            logging.error(f"{err}")
     start = time() - 6
     while True:
-        if time() - start >= 5:
-            start = time()
-            raw_rows = weather_db.find_null()
-            if raw_rows:
-                for row in raw_rows:
-                    current_row = weather_db.get_master_string(row)
-                    string_list = create_raw_data_array(current_row)
-                    logging.debug(f"Row: {row}")
-                    logging.debug(f"Row string: {string_list}")
-                    row = row[0]
-                    parse_data(string_list, row, columns)
-            weather_db.db_close()
+        try:
+            if time() - start >= 5:
+                start = time()
+                raw_rows = weather_db.find_null()
+                if raw_rows:
+                    for row in raw_rows:
+                        current_row = weather_db.get_raw_string(row)
+                        assert (current_row), "No raw string"
+                        string_list = create_raw_data_array(current_row)
+                        logging.debug(f"Row: {row}")
+                        row = row[0]
+                        parse_data(string_list, row, columns)
+                weather_db.db_close()
+        except AssertionError as err:
+            logging.error(f"{err}")
+        except Exception as err:
+            exc = traceback.format_exc()
+            logging.error(f"{err}")
+            logging.debug(f"{exc}")
 
 if __name__ == "__main__":
     main()
