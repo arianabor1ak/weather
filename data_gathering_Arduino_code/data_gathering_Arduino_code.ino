@@ -23,7 +23,7 @@ void setup()
   Serial1.begin(57600);                   // this is the baud rate that the Arduino sends the concantenated string of data to the teensy
                                           //
   Serial.print("QQ");                     // send a QQ to start the data collection
-  // delay(13000);                           // wait up to 13 seconds for the data to be collected
+  delay(20000);                           // wait 20 seconds for the data to be collected
 
   b_data = getData("SS", 10000);                 // read the bottom section data including 30 volt supply
     
