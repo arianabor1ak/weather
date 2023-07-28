@@ -84,7 +84,6 @@ unsigned long previous_millis = 0;                          //legacy code
 void setup_ethernet() {
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed to obtain an IP address using DHCP");
-    while(true);      // we shouldn't have it loop without condition-less forever. 
 
   }
   else { 
