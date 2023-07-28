@@ -19,13 +19,13 @@ String stringToSend = "";                 // this is the concantenated string of
 
 void setup()
 {
-  Serial.begin(9600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
+  Serial.begin(57600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
   Serial1.begin(57600);                   // this is the baud rate that the Arduino sends the concantenated string of data to the teensy
                                           //
   Serial.print("QQ");                     // send a QQ to start the data collection
   delay(20000);                           // wait 20 seconds for the data to be collected
 
-  b_data = getData("SS", 10000);                 // read the bottom section data including 30 volt supply
+  b_data = getData("SS", 5000);                 // read the bottom section data including 30 volt supply
     
   one_data = getData("11", 5000);               // read the top section mux data
     
@@ -39,7 +39,7 @@ void setup()
   Serial.begin(38400);
   kz_data = getData("KZ", 5000);              // read the top section aux power supply data
   Serial.flush();
-  Serial.begin(9600);
+  Serial.begin(57600);
 
   stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
 }
@@ -86,7 +86,7 @@ void loop()
       // delay(13000);                          // wait up to 13 seconds for the data to be collected
       //not sure if the delay is necessary since it's not affecting anything yet
    
-      b_data = getData("SS", 10000);                 // read the bottom section data including 30 volt supply
+      b_data = getData("SS", 25000);                 // read the bottom section data including 30 volt supply
     
       one_data = getData("11", 5000);               // read the top section mux data
     
@@ -100,7 +100,7 @@ void loop()
       Serial.begin(38400);
       kz_data = getData("KZ", 5000);              // read the top section aux power supply data
       Serial.flush();
-      Serial.begin(9600);
+      Serial.begin(57600);
 
       //concatenate the string before the Teensy requests more data
       stringToSend = "S-\t" + b_data + "1-\t" + one_data + "2-\t" + two_data + "3-\t" + three_data + "4-\t" + four_data + "Z-\t" + kz_data + "@";
