@@ -52,7 +52,8 @@ PubSubClient mqttClient(ethClient);
 
 String topic = "CarletonWeatherTower";
 
-// NTP Servers (2 alternatives are listed. It may be possible to connect to ntp pool and not worry about which specific ip is available): 
+// NTP Servers (2 alternatives are listed. It may be possible to connect to 
+// 'ntp pool' and not worry about which specific ip address is available): 
 IPAddress timeServer(129, 6, 15, 28); // time-a-g.nist.gov    NIST, Gaithersburg, Maryland
 // IPAddress timeServer(132, 163, 97, 1); // time-a-wwv.nist.gov    WWV, Fort Collins, Colorado
 // IPAddress timeServer(132, 163, 96, 1); // time-a-b.nist.gov    NIST, Boulder, Colorado
@@ -120,7 +121,7 @@ time_t getTeensy3Time()
 void setup_broker() {
   Serial.print("Status code before initializing to broker server: ");
   Serial.println(mqttClient.state());
-  mqttClient.setServer("test.mosquitto.org", 1883);
+  mqttClient.setServer("test.mosquitto.org", 1883);  // Will be changed to a dedicated MQTT server at Carleton
   Serial.print("Status code after initializing to broker server: ");
   Serial.println(mqttClient.state());
 }
@@ -152,24 +153,31 @@ void publish_string(String topic, String data) {
   Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
 }
 
+// The code will not move on if the SD setup fails. 
+// It will loop forever until the SD setup succeeds. 
 void setup_SD() {
-  Serial.print("Initializing SD card...");     
-  if (!SD.begin(BUILTIN_SDCARD)) {
-    Serial.println("SD initialization failed!");
-    while (1);   // If the SD card initialization fails, the code effectively stops here. 
+  bool setup_success = false;
+  while (!setup_success) {
+    Serial.print("Initializing SD card...");     
+    if (!SD.begin(BUILTIN_SDCARD)) {
+      Serial.println("SD initialization failed!");
+      delay(5000); // Try SD setup again after 5 seconds.
+      continue; 
+    }
+    if (!SD.exists("unpublished")) {
+      SD.mkdir("unpublished");
+    }
+    if (!SD.exists("published")) {
+      SD.mkdir("published");
+    }
+    setup_success = true;
+    Serial.println("SD initialization done.");
   }
-  if (!SD.exists("unpublished")) {
-    SD.mkdir("unpublished");
-  }
-  if (!SD.exists("published")) {
-    SD.mkdir("published");
-  }
-  Serial.println("SD initialization done.");
 }
 
 // Saves the input data string to an SD card as a .txt file inside the folder "unpublished"
 // ** The specificed file name should not include the file type (.txt), only the name.
-// ** The "".txt" is added inside the function
+// ** The "".txt" is added inside this function
 void unpublishedToSD(String dataString, String fileName) {
   String filePath = "unpublished/" + fileName + ".txt";
   File savedData = SD.open(filePath.c_str(), FILE_WRITE);
@@ -183,7 +191,7 @@ void unpublishedToSD(String dataString, String fileName) {
 }
 
 // Saves the input data string to an SD card as a .txt file inside the folder "published"
-// ** Same file name specifics as unpublishedToSD
+// ** Same file name specifications as unpublishedToSD() function
 void publishedToSD(String dataString, String fileName) {
   String filePath = "published/" + fileName + ".txt";
   File savedData = SD.open(filePath.c_str(), FILE_WRITE);
@@ -196,31 +204,10 @@ void publishedToSD(String dataString, String fileName) {
   } 
 }
 
-// Reads data from the SD card from the specified file name 
-// ** The parameter fileName should not include the file type, only the name of the file. 
-// ** It is assumed all files on the SD card are .txt files.
-// Returns void for now. Could return the string from the file or
-// could return void and publish the string within this function.
-void readFromSD(String fileName) {
-  String returnStr = "";
-  fileName += ".txt";
-  File fileSD = SD.open(fileName.c_str(), FILE_READ);
-  if (fileSD) {
-    Serial.println("Reading from file: " + fileName);
-    // read from the file until there's nothing else in it:
-    while (fileSD.available()) {
-    	returnStr += fileSD.readString();
-    }
-    fileSD.close();
-  } else {
-    Serial.println("error opening file: " + fileName);
-  }
-}
-
 // Moves(copies and deletes original) one file(passed as a param) to the 
 // folder named "published" and publishes the data from that file to mqtt client. 
 // ** Assumes mqtt connection has been established.
-// ** This function assumes sourceFile param ends in .txt
+// ** This function assumes sourceFile param ends in ".txt"
 void processUnpublishedFile (File unpublishedFile) { 
   Serial.println("unpublishedFile name = " + String(unpublishedFile.name()));
   String destPath = "published/" + String(unpublishedFile.name());;
@@ -363,7 +350,7 @@ void loop() {
         }
       }
     }
-    delay(1000); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
+    delay(500); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
   }
   unpublishedFolder.close();
   // Serial.println("END OF MAIN LOOP"); // testing
