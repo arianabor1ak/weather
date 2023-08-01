@@ -105,6 +105,7 @@ void setup_NTP() {
   timeOfLatestSync = now();
   if (timeStatus()!= timeSet) {
     Serial.println("Unable to sync with the RTC");
+
   } else {
     Serial.println("RTC has set the system time");
   }
@@ -153,25 +154,14 @@ void publish_string(String topic, String data) {
   Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
 }
 
-// The code will not move on if the SD setup fails. 
-// It will loop forever until the SD setup succeeds. 
-void setup_SD() {
-  bool setup_success = false;
-  while (!setup_success) {
-    Serial.print("Initializing SD card...");     
-    if (!SD.begin(BUILTIN_SDCARD)) {
-      Serial.println("SD initialization failed!");
-      delay(5000); // Try SD setup again after 5 seconds.
-      continue; 
-    }
-    if (!SD.exists("unpublished")) {
-      SD.mkdir("unpublished");
-    }
-    if (!SD.exists("published")) {
-      SD.mkdir("published");
-    }
-    setup_success = true;
+bool setup_SD() {
+  Serial.print("Initializing SD card...");     
+  if (SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD initialization done.");
+    return true;
+  } else {
+    Serial.println("SD initialization failed!.");
+    return false;
   }
 }
 
@@ -186,7 +176,7 @@ void unpublishedToSD(String dataString, String fileName) {
     savedData.close();
     Serial.println("Unpublished data saved to SD card in file: " + filePath);
   } else {
-    Serial.println("error opening file:" + filePath);
+    Serial.println("error opening file: " + filePath);
   } 
 }
 
@@ -200,7 +190,7 @@ void publishedToSD(String dataString, String fileName) {
     savedData.close();
     Serial.println("Published data saved to SD card in file: " + filePath);
   } else {
-    Serial.println("error opening file:" + filePath);
+    Serial.println("error opening file: " + filePath);
   } 
 }
 
@@ -236,7 +226,18 @@ void setup() {
   // while (!Serial);                           // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
   delay(500);
-  setup_SD();                           // SD card and folders setup
+
+  if (!setup_SD()){                             // SD card setup
+    setup_SD();                                 // Attempts SD setup again if first try failed.
+  } else {
+    if (!SD.exists("unpublished")) {            // Folder setup in SD card
+      SD.mkdir("unpublished");
+    }
+    if (!SD.exists("published")) {
+      SD.mkdir("published");
+    }
+  } 
+
   delay(500);
   setup_ethernet();
   delay(2000);
@@ -264,7 +265,7 @@ void loop() {
   clearSerial1Buffer();       
   Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
   Serial.println("Requesting data from the arduino");
-  while(!Serial1.available() && (millis() < millisOfRequest + 20000)); // && (millis() < millisOfRequest + 20000) This just waits until there is something in the serial1 buffer or 20 secs has passed with nothing in serial1 buffer.
+  while(!Serial1.available() && (millis() < millisOfRequest + 60000)); // && (millis() < millisOfRequest + 20000) This just waits until there is something in the serial1 buffer or 60 secs has passed with nothing in serial1 buffer.
   if (Serial1.available()) {
     // Serial.println("Serial1 is available!"); // testing
     // Need this char later on because Serial.read() sends text as ASCII decimal.
@@ -280,8 +281,10 @@ void loop() {
     // Serial.println("Starting char 'S' found! "); // testing
 
     // Records the time of when the 'S' is read
+    // The "0" is a flag for if the data has been saved to the SD card, it is present in the raw 
+    // data table, but is removed from the formatted data table. 0 = not saved, 1 = saved.
     timeOfNewData = now();
-    data = String(timeOfNewData) + "\t";   
+    data = "0" + String(timeOfNewData) + "\t";   
 
     data.concat(String(character));                 // Adds the 'S' that was detetected to the data string.        
 
@@ -299,13 +302,11 @@ void loop() {
     }
     // Serial.println("exited loop."); // testing
 
-    Serial.print("Data: ");
-    Serial.println(data);
-
     // Serial.println("Beginning publishing data."); // testing
     // Returns 1 or 3 if Ethernet connection is not maintained. 
     // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
     byte ethReturnByte = Ethernet.maintain(); 
+    Serial.println("Ethernet return byte: " + String(ethReturnByte)); // testing
     // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
     if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
       // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
@@ -314,46 +315,68 @@ void loop() {
       }
       // Since ethernet is available, attempts to publish data via mqtt protocol.
       commence_connection();
-      if (!mqttClient.connected()) {    // if first connection fails, try only 1 more time.
+      if (!mqttClient.connected()) {      // if first connection fails, try just 1 more time.
         commence_connection();
-      }
-      if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
-        Serial.println("MQTT not connected");
-        unpublishedToSD(data, timeOfNewData);
-      }
-      else {    
-        publishedToSD(data, timeOfNewData);
-        publish_string(topic, data);
-        Serial.println("Publication topic: " + topic); 
-      }
-    }
-    // If ethReturnByte return 1 or 3:
-    else {
-      Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
-      unpublishedToSD(data, timeOfNewData);
-    }
-  }
-
-  // Serial.println("Begining processing unpublished data."); // testing
-  // This section attempts to publish data that was not published but stored in the SD/
-  // It does this until it has been 30 seconds since the last data request to arduino.
-  File unpublishedFolder = SD.open("unpublished/");
-  while ((millis() < (millisOfRequest + 30000))) {
-    File unpublishedFile = unpublishedFolder.openNextFile();                  
-    if (unpublishedFile) {                                                    // Checks if folder contains any files
-      byte ethReturnByte = Ethernet.maintain();                               
-      if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {   // Checks for good ethernet connection
-        commence_connection();                                                 
-        if (mqttClient.connected()) {                                         // Checks for good mqtt client connection
-          processUnpublishedFile(unpublishedFile);
-          unpublishedFile.close();
+        if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
+          Serial.println("MQTT not connected");
+          if (!setup_SD()) {
+            Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
+          } else {
+            data[0] = '1';
+            unpublishedToSD(data, timeOfNewData);
+          }
+        }
+      } else {
+        if (setup_SD()) {
+          data[0] = '1';
+          publishedToSD(data, timeOfNewData);
+          publish_string(topic, data);
+          Serial.println("Publication topic: " + topic); 
+        } else {
+          publishedToSD(data, timeOfNewData);
+          publish_string(topic, data);
+          Serial.println("Publication topic: " + topic); 
         }
       }
     }
-    delay(500); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
+    // If ethReturnByte returns 1 or 3:
+    else {
+      Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
+      if (!setup_SD()) {
+        Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
+      } else {
+        data[0] = '1';
+        unpublishedToSD(data, timeOfNewData);
+      }
+    }
   }
-  unpublishedFolder.close();
-  // Serial.println("END OF MAIN LOOP"); // testing
+
+  // For testing
+  Serial.print("Data: ");
+  Serial.println(data);
+
+  // This section attempts to publish data that was not published but stored in the SD/
+  // It does this until it has been 30 seconds since the last data request to arduino.
+  if (setup_SD()) {
+    File unpublishedFolder = SD.open("unpublished/");
+    while ((millis() < (millisOfRequest + 30000))) {
+      File unpublishedFile = unpublishedFolder.openNextFile();                  
+      if (unpublishedFile) {                                                    // Checks if folder contains any files
+        byte ethReturnByte = Ethernet.maintain();                               
+        if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {   // Checks for good ethernet connection
+          commence_connection();                                                 
+          if (mqttClient.connected()) {                                         // Checks for good mqtt client connection
+            processUnpublishedFile(unpublishedFile);
+            unpublishedFile.close();
+          }
+        }
+      }
+      delay(500); // Will writing really quickly degrade the SD card? Not sure how long we should wait if so.
+    }
+    unpublishedFolder.close();
+  } else {
+    while ((millis() < (millisOfRequest + 30000)));
+  }
 }
 
 // Clears the Serial1 buffer. 
@@ -392,7 +415,7 @@ time_t getNtpTime()
     }
   }
   Serial.println("No NTP Response :-(");
-  return 0; // return 0 if unable to get the time
+  return getTeensy3Time(); // return time from teensy internal clock if unable to get the time with NTP
 }
 
 // send an NTP request to the time server at the given address
