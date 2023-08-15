@@ -1,4 +1,3 @@
-
 //  
 //
 //              This is Teensy 4.1 code that uses MQTT to send the Master String
@@ -32,8 +31,10 @@
 #include <PubSubClient.h>       //Teensy MQTT implementation library
 #include <SD.h>
 
+// #include <QNEthernet.h> // Alternative Ethernet library. 
+
 // Manually changed in the PubSubClient.h file because the #define didn't seem to work.
-#define MQTT_MAX_PACKET_SIZE 3000; // Set the maximum number of bytes that can be sent as MQTT payload. 
+// #define MQTT_MAX_PACKET_SIZE 3000; // Set the maximum number of bytes that can be sent as MQTT payload. 
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
@@ -49,6 +50,10 @@ byte mac[] = {0x04, 0xe9, 0xe5, 0x0b, 0xab, 0x6c};          //MAC address for Sn
 
 EthernetClient ethClient;
 PubSubClient mqttClient(ethClient);
+// PubSubClient& j = mqttClient.setKeepAlive(60);
+// PubSubClient& k = mqttClient.setSocketTimeout(60);
+bool i = mqttClient.setBufferSize(10000);
+
 
 String topic = "CarletonWeatherTower";
 
@@ -145,15 +150,14 @@ void commence_connection() {
   }
 }
 
+// Publishes string using MQTT to brokers.
 void publish_string(String topic, String data) {
-  char topic_array[topic.length()* 2];
-  topic.toCharArray(topic_array, sizeof(topic_array));
-  char data_array[data.length() * 2];
-  data.toCharArray(data_array, sizeof(data_array));
   Serial.print("Publishing Check...");
-  Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
+  Serial.println(mqttClient.publish(topic.c_str(), data.c_str()));      // Returns 1 for success, 0 for fail. 
+
 }
 
+// Sets up SD card
 bool setup_SD() {
   Serial.print("Initializing SD card...");     
   if (SD.begin(BUILTIN_SDCARD)) {
@@ -166,7 +170,7 @@ bool setup_SD() {
 }
 
 // Saves the input data string to an SD card as a .txt file inside the folder "unpublished"
-// ** The specificed file name should not include the file type (.txt), only the name.
+// ** The param fileName should not include the file type (.txt), only the name.
 // ** The "".txt" is added inside this function
 void unpublishedToSD(String dataString, String fileName) {
   String filePath = "unpublished/" + fileName + ".txt";
@@ -194,7 +198,7 @@ void publishedToSD(String dataString, String fileName) {
   } 
 }
 
-// Moves(copies and deletes original) one file(passed as a param) to the 
+// Moves(aka copies and deletes original) a specified file to the 
 // folder named "published" and publishes the data from that file to mqtt client. 
 // ** Assumes mqtt connection has been established.
 // ** This function assumes sourceFile param ends in ".txt"
@@ -218,10 +222,8 @@ void processUnpublishedFile (File unpublishedFile) {
 
 }
 
-// String request_data() {} //is this necessary? how is this different from callback?
-
 void setup() {
-  Serial1.begin(57600);                         // baud rate to talk to the Arduino Mega; simulator uses 9600
+  Serial1.begin(57600);                         // baud rate to talk to the Arduino Mega;
   Serial.begin(9600);                           // baud rate for the teensy serial monitor
   // while (!Serial);                           // setup() commences only when serial monitor is opened. FOR TESTING PURPOSES ONLY. DELETE IN PRODUCTION.
   Serial.println("Teensy is in setup");
@@ -251,33 +253,30 @@ void setup() {
 //Sends signal to get data every 30 seconds
 void loop() {
   time_t timeOfNewData;   // var that holds the time of when data was received by the Teensy from the Arduino.
-  // unsigned long current_millis = millis();
-  // if (current_millis - previous_millis >= 30000) {      // get the data every 30 seconds
-  //   previous_millis = current_millis;                   // reset the millisecond tracker to the current time
-
-  //   clearSerial1Buffer();       
-  //   Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
-  //   Serial.println("Requesting data from the arduino");
-  // }
-  // delay(5000);       // Data seemed to be sent fine from Arduino without the delay.
-
   unsigned long millisOfRequest = millis();
-  clearSerial1Buffer();       
+  unsigned long loopStart = 0;
+
+  clearSerial1Buffer();   
   Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
   Serial.println("Requesting data from the arduino");
-  while(!Serial1.available() && (millis() < millisOfRequest + 60000)); // && (millis() < millisOfRequest + 20000) This just waits until there is something in the serial1 buffer or 60 secs has passed with nothing in serial1 buffer.
+  while (!Serial1.available() && (millis() < millisOfRequest + 23000)); // This just waits until there is something in the serial1 buffer. 23 sec timeout.
+  Serial.println("Inside of first while loop.");
   if (Serial1.available()) {
+    Serial.println("Serial was available.");
     // Serial.println("Serial1 is available!"); // testing
     // Need this char later on because Serial.read() sends text as ASCII decimal.
     // Setting char character = Serial.read() will "typecast" the output as a char.
     char character = 'a';
 
     // Loops through Serial1 buffer until 'S'(the starting char) is detected.
-    // Maybe this detection code is unessary but the
+    // Maybe this detection code is unessary/redundant but the
     // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
-    while (character != 'S')  {                                   
+    Serial.println("Reading serial till char = 'S' ");
+    loopStart = millis();
+    while (character != 'S' && millis() < (loopStart + 5000))  {                                   
       character = Serial1.read();       
     }
+    Serial.println("Left reading serial while loop");
     // Serial.println("Starting char 'S' found! "); // testing
 
     // Records the time of when the 'S' is read
@@ -286,29 +285,38 @@ void loop() {
     timeOfNewData = now();
     data = "0" + String(timeOfNewData) + "\t";   
 
-    data.concat(String(character));                 // Adds the 'S' that was detetected to the data string.        
+    data.concat(String(character));   // Adds the 'S' that was detetected to "data".        
 
     // Reads from Serial1, byte by byte, and adds the char that was read
     // until the terminating char '@' is read. 
-    // Serial.print("Entering loop to read Serial1..."); // testing
-    while (character != '@') {                      // ASCII code for '@' = 64
-      while(Serial1.available()) {      
+    Serial.print("Entering loop to read Serial1..."); // testing
+    loopStart = millis();
+    while (character != '@' && millis() < (loopStart + 5000)) {               // ASCII code for '@' = 64
+      while (Serial1.available() && millis() < (loopStart + 5000)) { 
+        // Serial.print(String(character)); //testing     
         character = Serial1.read();
         data.concat(String(character));
         if (character == '@') {
+          // Serial.print("@ char was detected!"); //testing  
           break;
         }
       }
     }
-    // Serial.println("exited loop."); // testing
 
-    // Serial.println("Beginning publishing data."); // testing
+    Serial.println(""); //testing      
+    Serial.println("exited loop."); // testing
+
+
+    Serial.println("Len of data: " + String(data.length()));
+
+    Serial.println("Beginning publishing data."); // testing
     // Returns 1 or 3 if Ethernet connection is not maintained. 
     // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
     byte ethReturnByte = Ethernet.maintain(); 
     Serial.println("Ethernet return byte: " + String(ethReturnByte)); // testing
     // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
     if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
+      Serial.println("Inside of sucess ethbyte");
       // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
       if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs 
         setup_NTP();
@@ -322,17 +330,19 @@ void loop() {
           if (!setup_SD()) {
             Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
           } else {
-            data[0] = '1';
+            data[0] = '1';                // Set the savedToSD flag to 1
             unpublishedToSD(data, timeOfNewData);
           }
         }
       } else {
         if (setup_SD()) {
-          data[0] = '1';
+          Serial.println("Published AND good SD");
+          data[0] = '1';                  // Set the savedToSD flag to 1
           publishedToSD(data, timeOfNewData);
           publish_string(topic, data);
           Serial.println("Publication topic: " + topic); 
         } else {
+          Serial.println("Published, no SD");
           publishedToSD(data, timeOfNewData);
           publish_string(topic, data);
           Serial.println("Publication topic: " + topic); 
@@ -345,7 +355,7 @@ void loop() {
       if (!setup_SD()) {
         Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
       } else {
-        data[0] = '1';
+        data[0] = '1';                // Set the savedToSD flag to 1
         unpublishedToSD(data, timeOfNewData);
       }
     }
@@ -356,10 +366,12 @@ void loop() {
   Serial.println(data);
 
   // This section attempts to publish data that was not published but stored in the SD/
-  // It does this until it has been 30 seconds since the last data request to arduino.
-  if (setup_SD()) {
+  // It does this until it has been 30 seconds since the last data request to the arduino.
+  if ((millis() < (millisOfRequest + 30000)) && setup_SD()) {
+    // Serial.println("Inside of(setupSD)"); // testing
     File unpublishedFolder = SD.open("unpublished/");
     while ((millis() < (millisOfRequest + 30000))) {
+      // Serial.println("Inside of(setupSD) while loop"); // testing
       File unpublishedFile = unpublishedFolder.openNextFile();                  
       if (unpublishedFile) {                                                    // Checks if folder contains any files
         byte ethReturnByte = Ethernet.maintain();                               
@@ -375,14 +387,18 @@ void loop() {
     }
     unpublishedFolder.close();
   } else {
+    // Serial.println("Inside of(setupSD) else"); // testing
     while ((millis() < (millisOfRequest + 30000)));
   }
+  data = "";
+  Serial.println("end of main loop");
 }
 
-// Clears the Serial1 buffer. 
+// Clears the Serial1 buffer. Times out after 30 s
 void clearSerial1Buffer() {
   // Serial.print("Clearing serial buffer..."); // testing
-  while (Serial1.available()) {
+  unsigned long clearStart = millis();
+  while (Serial1.available() && (millis() < clearStart + 30000)) {
     Serial1.read();
   }
   // Serial.println("cleared."); // testing

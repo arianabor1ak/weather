@@ -98,7 +98,7 @@ void loop()
     
       Serial.flush();
       Serial.begin(38400);
-      kz_data = getData("KZ", 5000);              // read the top section aux power supply data
+      kz_data = getData("KZ", 5000);              // read the top section aux power supply data. 
       Serial.flush();
       Serial.begin(57600);
 
