@@ -146,12 +146,15 @@ void commence_connection() {
 }
 
 void publish_string(String topic, String data) {
-  char topic_array[topic.length()* 2];
+  data = data + data;
+  // Serial.print("Double data: ");
+  // Serial.println(data);
+  char topic_array[topic.length() + 1];
   topic.toCharArray(topic_array, sizeof(topic_array));
-  char data_array[data.length() * 2];
+  char data_array[data.length() + 1];
   data.toCharArray(data_array, sizeof(data_array));
   Serial.print("Publishing Check...");
-  Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 0 for success, 1 for fail. 
+  Serial.println(mqttClient.publish(topic_array, data_array));      // Returns 1 for success, 0 for fail.
 }
 
 bool setup_SD() {
@@ -440,5 +443,3 @@ void sendNTPpacket(IPAddress &address)
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
 }
-
-
