@@ -72,11 +72,8 @@ unsigned int localPort = 8888;  // local port to listen for UDP packets
 time_t timeOfLatestSync;       // Used to sync clock to NTP server if latest sync was more than 24 hrs ago. 
 
 
-String input = "";                                          //legacy code
-String data = "";                                           //legacy code
-
-unsigned long timer = 0;                                    //legacy code
-unsigned long previous_millis = 0;                          //legacy code
+String data = "";                                           // String that holds data to publish
+int request_time = 30000; // change back to 30000
 
 //------------------------------------------------------------------------------------------------------------
 
@@ -153,8 +150,7 @@ void commence_connection() {
 // Publishes string using MQTT to brokers.
 void publish_string(String topic, String data) {
   Serial.print("Publishing Check...");
-  Serial.println(mqttClient.publish(topic.c_str(), data.c_str()));      // Returns 1 for success, 0 for fail. 
-
+  Serial.println(mqttClient.publish(topic.c_str(), data.c_str()));      // Returns 1 for success, 0 for fail.
 }
 
 // Sets up SD card
@@ -259,7 +255,7 @@ void loop() {
   clearSerial1Buffer();   
   Serial1.print("GD");                                // send a "GD" to the arduino to Get the Data
   Serial.println("Requesting data from the arduino");
-  while (!Serial1.available() && (millis() < millisOfRequest + 23000)); // This just waits until there is something in the serial1 buffer. 23 sec timeout.
+  while (!Serial1.available() && (millis() < millisOfRequest + 19000)); // This just waits until there is something in the serial1 buffer. 23 sec timeout.
   Serial.println("Inside of first while loop.");
   if (Serial1.available()) {
     Serial.println("Serial was available.");
@@ -273,90 +269,93 @@ void loop() {
     // clearSerial1Buffer doesn't always seem to work. More testing needed so we don't need both.
     Serial.println("Reading serial till char = 'S' ");
     loopStart = millis();
-    while (character != 'S' && millis() < (loopStart + 5000))  {                                   
-      character = Serial1.read();       
+    while (character != 'S' && millis() < (loopStart + 2000))  {                                   
+      character = Serial1.read();
+      Serial.println(character);      
     }
-    Serial.println("Left reading serial while loop");
+    Serial.println("Left reading serial while loop. Current character = " + String(character));
     // Serial.println("Starting char 'S' found! "); // testing
 
-    // Records the time of when the 'S' is read
-    // The "0" is a flag for if the data has been saved to the SD card, it is present in the raw 
-    // data table, but is removed from the formatted data table. 0 = not saved, 1 = saved.
-    timeOfNewData = now();
-    data = "0" + String(timeOfNewData) + "\t";   
+    if (character == 'S') {
+      // Records the time of when the 'S' is read
+      // The "0" is a flag for if the data has been saved to the SD card, it is present in the raw 
+      // data table, but is removed from the formatted data table. 0 = not saved, 1 = saved.
+      timeOfNewData = now();
+      data = "0" + String(timeOfNewData) + "\t";   
 
-    data.concat(String(character));   // Adds the 'S' that was detetected to "data".        
+      data.concat(String(character));   // Adds the 'S' that was detetected to "data".        
 
-    // Reads from Serial1, byte by byte, and adds the char that was read
-    // until the terminating char '@' is read. 
-    Serial.print("Entering loop to read Serial1..."); // testing
-    loopStart = millis();
-    while (character != '@' && millis() < (loopStart + 5000)) {               // ASCII code for '@' = 64
-      while (Serial1.available() && millis() < (loopStart + 5000)) { 
-        // Serial.print(String(character)); //testing     
-        character = Serial1.read();
-        data.concat(String(character));
-        if (character == '@') {
-          // Serial.print("@ char was detected!"); //testing  
-          break;
-        }
-      }
-    }
-
-    Serial.println(""); //testing      
-    Serial.println("exited loop."); // testing
-
-
-    Serial.println("Len of data: " + String(data.length()));
-
-    Serial.println("Beginning publishing data."); // testing
-    // Returns 1 or 3 if Ethernet connection is not maintained. 
-    // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
-    byte ethReturnByte = Ethernet.maintain(); 
-    Serial.println("Ethernet return byte: " + String(ethReturnByte)); // testing
-    // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
-    if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
-      Serial.println("Inside of sucess ethbyte");
-      // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
-      if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs 
-        setup_NTP();
-      }
-      // Since ethernet is available, attempts to publish data via mqtt protocol.
-      commence_connection();
-      if (!mqttClient.connected()) {      // if first connection fails, try just 1 more time.
-        commence_connection();
-        if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
-          Serial.println("MQTT not connected");
-          if (!setup_SD()) {
-            Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
-          } else {
-            data[0] = '1';                // Set the savedToSD flag to 1
-            unpublishedToSD(data, timeOfNewData);
+      // Reads from Serial1, byte by byte, and adds the char that was read
+      // until the terminating char '@' is read. 
+      Serial.print("Entering loop to read Serial1..."); // testing
+      loopStart = millis();
+      while (character != '@' && millis() < (loopStart + 7000)) {               // ASCII code for '@' = 64
+        while (Serial1.available() && millis() < (loopStart + 7000)) { 
+          // Serial.print(String(character)); //testing     
+          character = Serial1.read();
+          data.concat(String(character));
+          if (character == '@') {
+            // Serial.print("@ char was detected!"); //testing  
+            break;
           }
         }
-      } else {
-        if (setup_SD()) {
-          Serial.println("Published AND good SD");
-          data[0] = '1';                  // Set the savedToSD flag to 1
-          publishedToSD(data, timeOfNewData);
-          publish_string(topic, data);
-          Serial.println("Publication topic: " + topic); 
+      }
+
+      Serial.println(""); //testing      
+      Serial.println("exited loop."); // testing
+
+
+      Serial.println("Len of data: " + String(data.length()));
+
+      Serial.println("Beginning publishing data."); // testing
+      // Returns 1 or 3 if Ethernet connection is not maintained. 
+      // Returns 2 or 4 if renewal/rebind successful. 0 = nothing happened/renewal was not needed.
+      byte ethReturnByte = Ethernet.maintain(); 
+      Serial.println("Ethernet return byte: " + String(ethReturnByte)); // testing
+      // Checks if Ethernet connection is still good(and updates IP from DHCP if needed) 
+      if (ethReturnByte == 2 || ethReturnByte == 4 || ethReturnByte == 0) {
+        Serial.println("Inside of sucess ethbyte");
+        // Since ethernet is available, syncs the time to NTP if previous sync was >= 24 hrs ago.
+        if (now() >= timeOfLatestSync + 86400000) {   // 86400000 ms = 24 hrs 
+          setup_NTP();
+        }
+        // Since ethernet is available, attempts to publish data via mqtt protocol.
+        commence_connection();
+        if (!mqttClient.connected()) {      // if first connection fails, try just 1 more time.
+          commence_connection();
+          if (!mqttClient.connected()) {    // if second attempt fails, just save to the SD card and move on.
+            Serial.println("MQTT not connected");
+            if (!setup_SD()) {
+              Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
+            } else {
+              data[0] = '1';                // Set the savedToSD flag to 1
+              unpublishedToSD(data, timeOfNewData);
+            }
+          }
         } else {
-          Serial.println("Published, no SD");
-          publishedToSD(data, timeOfNewData);
-          publish_string(topic, data);
-          Serial.println("Publication topic: " + topic); 
+          if (setup_SD()) {
+            Serial.println("Published AND good SD");
+            data[0] = '1';                  // Set the savedToSD flag to 1
+            publishedToSD(data, timeOfNewData);
+            publish_string(topic, data);
+            Serial.println("Publication topic: " + topic); 
+          } else {
+            Serial.println("Published, no SD");
+            publishedToSD(data, timeOfNewData);
+            publish_string(topic, data);
+            Serial.println("Publication topic: " + topic); 
+          }
         }
       }
-    }
-    // If ethReturnByte returns 1 or 3:
-    else {
-      Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
-      if (!setup_SD()) {
-        Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
-      } else {
-        data[0] = '1';                // Set the savedToSD flag to 1
-        unpublishedToSD(data, timeOfNewData);
+      // If ethReturnByte returns 1 or 3:
+      else {
+        Serial.println("Ethernet not connected, maintain() returned " + ethReturnByte);
+        if (!setup_SD()) {
+          Serial.println("Unable to setup SD. Data Lost Forever.");  // This means the data was not published nor saved to the SD.
+        } else {
+          data[0] = '1';                // Set the savedToSD flag to 1
+          unpublishedToSD(data, timeOfNewData);
+        }
       }
     }
   }
@@ -367,10 +366,10 @@ void loop() {
 
   // This section attempts to publish data that was not published but stored in the SD/
   // It does this until it has been 30 seconds since the last data request to the arduino.
-  if ((millis() < (millisOfRequest + 30000)) && setup_SD()) {
+  if ((millis() < (millisOfRequest + request_time)) && setup_SD()) {
     // Serial.println("Inside of(setupSD)"); // testing
     File unpublishedFolder = SD.open("unpublished/");
-    while ((millis() < (millisOfRequest + 30000))) {
+    while ((millis() < (millisOfRequest + request_time))) {
       // Serial.println("Inside of(setupSD) while loop"); // testing
       File unpublishedFile = unpublishedFolder.openNextFile();                  
       if (unpublishedFile) {                                                    // Checks if folder contains any files
@@ -388,7 +387,7 @@ void loop() {
     unpublishedFolder.close();
   } else {
     // Serial.println("Inside of(setupSD) else"); // testing
-    while ((millis() < (millisOfRequest + 30000)));
+    while ((millis() < (millisOfRequest + request_time)));
   }
   data = "";
   Serial.println("end of main loop");
@@ -398,7 +397,7 @@ void loop() {
 void clearSerial1Buffer() {
   // Serial.print("Clearing serial buffer..."); // testing
   unsigned long clearStart = millis();
-  while (Serial1.available() && (millis() < clearStart + 30000)) {
+  while (Serial1.available() && (millis() < clearStart + 10000)) {
     Serial1.read();
   }
   // Serial.println("cleared."); // testing
@@ -456,5 +455,3 @@ void sendNTPpacket(IPAddress &address)
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
 }
-
-
