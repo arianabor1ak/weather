@@ -1,9 +1,16 @@
 #include <TimeLib.h>
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------
-String data;
+// char teensy_data[3];
 String teensy_data;
-String stringList[6];                // this is the concantenated string of the above sub-strings of data that comprises the tower data.
+// char s_data[200];
+// char one_data[130];
+// char two_data[100];
+// char three_data[100];
+// char four_data[100];
+// char kz_data[60];
+// char stringList[6] = {s_data, one_data, two_data, three_data, four_data, kz_data};                // this is the concantenated string of the above sub-strings of data that comprises the tower data.
+String stringList[6];
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------
 //
@@ -13,13 +20,13 @@ String stringList[6];                // this is the concantenated string of the 
 
 void setup()
 {
-  // delay(125000);
+  delay(125000);
   
   Serial.begin(57600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
   Serial1.begin(57600);                   // this is the baud rate that the Arduino sends the concantenated string of data to the teensy
 
   Serial.print("QQ");                     // send a QQ to start the data collection
-  delay(10000);                           // wait 20 seconds for the data to be collected
+  delay(15000);                           // wait 20 seconds for the data to be collected
 
   stringList[0] = "S-\t" + getData("SS", 3000);                 // read the bottom section data including 30 volt supply
     
@@ -64,25 +71,14 @@ void loop()
     {                                         // the teensy reads the string of data.  Once it has it the Arduino collects the updated data.
       
       int data;
-      for (data = 0; data < 1; data++) { //data < 6
-        int stringLength = stringList[data].length();
-        while(stringLength > 0) //while there are still characters in the string
-        {
-          int j = 0;
-          while (j < 30 && stringLength > 0) //write 30 bytes at a time, otherwise the buffer will overflow
-          {
-            Serial1.write(stringList[data].charAt(0)); //write one byte to the buffer
-            stringList[data].remove(0, 1); //remove the first character from the string
-            stringLength--;
-            j++;
-          }
-          delay(75); //wait for the Teensy to read from the buffer
-        }
+      for (data = 0; data < 6; data++) {
+        Serial1.print(stringList[data]);
+        delay(300);
       }
       Serial1.print("\t@");
 
       Serial.print("QQ");                       // send a QQ to start the data collection
-      delay(10000);
+      delay(15000);
    
       stringList[0] = "S-\t" + getData("SS", 3000);                 // read the bottom section data including 30 volt supply
     
