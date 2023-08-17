@@ -13,30 +13,28 @@ String stringList[6];                // this is the concantenated string of the 
 
 void setup()
 {
-  delay(125000);
+  // delay(125000);
   
   Serial.begin(57600);                    // this is the baud rate for all the data from the tower: the bottom section and top section
   Serial1.begin(57600);                   // this is the baud rate that the Arduino sends the concantenated string of data to the teensy
 
   Serial.print("QQ");                     // send a QQ to start the data collection
-  delay(15000);                           // wait 20 seconds for the data to be collected
+  delay(10000);                           // wait 20 seconds for the data to be collected
 
-  stringList[0] = "S-\t" + getData("SS", 1300);                 // read the bottom section data including 30 volt supply
+  stringList[0] = "S-\t" + getData("SS", 3000);                 // read the bottom section data including 30 volt supply
     
-  stringList[1] = "\t1-\t" + getData("11", 750);               // read the top section mux data
+  stringList[1] = "\t1-\t" + getData("11", 3000);               // read the top section mux data
     
-  stringList[2] = "\t2-\t" + getData("22", 750);               // read the top section sway sensor data
+  stringList[2] = "\t2-\t" + getData("22", 3000);               // read the top section sway sensor data
     
-  stringList[3] = "\t3-\t" + getData("33", 750);             // read the top section flux data
+  stringList[3] = "\t3-\t" + getData("33", 3000);             // read the top section flux data
 
-  stringList[4] = "\t4-\t" + getData("44", 750);              // read the top section triaxial magnetometer sensor data
+  stringList[4] = "\t4-\t" + getData("44", 3000);              // read the top section triaxial magnetometer sensor data
     
   Serial.flush();
   Serial.begin(38400);
 
-  delay(350);
-
-  stringList[5] = "\tZ-\t" + getData("KZ", 4000);              // read the top section aux power supply data
+  stringList[5] = "\tZ-\t" + getData("KZ", 3000);              // read the top section aux power supply data
   Serial.flush();
   Serial.begin(57600);
 }
@@ -66,7 +64,7 @@ void loop()
     {                                         // the teensy reads the string of data.  Once it has it the Arduino collects the updated data.
       
       int data;
-      for (data = 0; data < 6; data++) {
+      for (data = 0; data < 1; data++) { //data < 6
         int stringLength = stringList[data].length();
         while(stringLength > 0) //while there are still characters in the string
         {
@@ -84,24 +82,22 @@ void loop()
       Serial1.print("\t@");
 
       Serial.print("QQ");                       // send a QQ to start the data collection
-      delay(15000);
+      delay(10000);
    
-      stringList[0] = "S-\t" + getData("SS", 1300);                 // read the bottom section data including 30 volt supply
+      stringList[0] = "S-\t" + getData("SS", 3000);                 // read the bottom section data including 30 volt supply
     
-      stringList[1] = "\t1-\t" + getData("11", 750);               // read the top section mux data
+      stringList[1] = "\t1-\t" + getData("11", 3000);               // read the top section mux data
         
-      stringList[2] = "\t2-\t" + getData("22", 750);               // read the top section sway sensor data
+      stringList[2] = "\t2-\t" + getData("22", 3000);               // read the top section sway sensor data
         
-      stringList[3] = "\t3-\t" + getData("33", 750);             // read the top section flux data
+      stringList[3] = "\t3-\t" + getData("33", 3000);             // read the top section flux data
 
-      stringList[4] = "\t4-\t" + getData("44", 750);              // read the top section triaxial magnetometer sensor data
+      stringList[4] = "\t4-\t" + getData("44", 3000);              // read the top section triaxial magnetometer sensor data
         
       Serial.flush();
       Serial.begin(38400);
 
-      delay(350);
-
-      stringList[5] = "\tZ-\t" + getData("KZ", 4000);              // read the top section aux power supply data
+      stringList[5] = "\tZ-\t" + getData("KZ", 3000);              // read the top section aux power supply data
       Serial.flush();
       Serial.begin(57600);
     }
@@ -136,7 +132,7 @@ String getData(String letters, unsigned long delayMillis){
     }
   }
   clearSerialBuffer();
-  delay(150);
+  delay(300);
   return data;
 }
 

@@ -149,6 +149,13 @@ void commence_connection() {
 
 // Publishes string using MQTT to brokers.
 void publish_string(String topic, String data) {
+  data = data + data;
+  // Serial.print("Double data: ");
+  // Serial.println(data);
+  char topic_array[topic.length() + 1];
+  topic.toCharArray(topic_array, sizeof(topic_array));
+  char data_array[data.length() + 1];
+  data.toCharArray(data_array, sizeof(data_array));
   Serial.print("Publishing Check...");
   Serial.println(mqttClient.publish(topic.c_str(), data.c_str()));      // Returns 1 for success, 0 for fail.
 }
